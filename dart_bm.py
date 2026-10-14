@@ -89,12 +89,18 @@ def resolve(query, corps):
 def find_report(corp_code):
     today = datetime.date.today()
     bgn = today - datetime.timedelta(days=365 * 3)
-    j = get_json("list.json", corp_code=corp_code,
-                 bgn_de=bgn.strftime("%Y%m%d"), end_de=today.strftime("%Y%m%d"),
-                 pblntf_detail_type="A001", page_count=100)
-    rows = j.get("list") or []
+    rows, page, total = [], 1, 1
+    while page <= total and page <= 10:
+        j = get_json("list.json", corp_code=corp_code,
+                     bgn_de=bgn.strftime("%Y%m%d"), end_de=today.strftime("%Y%m%d"),
+                     pblntf_ty="A", pblntf_detail_type="A001", page_count=100, page_no=page)
+        rows += j.get("list") or []
+        total = int(j.get("total_page") or 1)
+        page += 1
+    # API 필터가 느슨할 수 있어 보고서명으로 한 번 더 거른다 (반기/분기/자율공시 제외)
+    rows = [r for r in rows if re.search(r"사업보고서\s*\(\d{4}\.\d{2}\)", r.get("report_nm", ""))]
     if not rows:
-        raise RuntimeError(f"사업보고서 없음 (status={j.get('status')}, {j.get('message')})")
+        raise RuntimeError("사업보고서 없음 (최근 3년 내 조회 결과에 '사업보고서 (YYYY.MM)' 없음)")
     rows.sort(key=lambda r: (r.get("rcept_dt", ""), r.get("rcept_no", "")), reverse=True)
     rep = rows[0]
     m = re.search(r"\((\d{4})\.\d{2}\)", rep.get("report_nm", ""))
