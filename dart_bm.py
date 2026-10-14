@@ -427,13 +427,25 @@ DIFF_KWS = ["수주", "증설", "신규", "계약", "중단", "철수", "인수"
             "고객", "원가", "가동", "감소", "증가", "확대", "축소", "신설", "개발", "승인", "허가", "임상", "양산", "공급"]
 
 
+def strip_risk(lines):
+    """위험관리·파생거래 소항목(분기보고서 사업의 내용에 포함, BM 변화와 무관한 주석성 문장)은 diff에서 제외."""
+    out, skip = [], False
+    for l in lines:
+        m = re.match(r"^\s*\d+\s*\.\s*(\S.*)", l)
+        if m and not l.startswith("|"):
+            skip = bool(re.match(r"위험\s*관리|파생", m.group(1)))
+        if not skip:
+            out.append(l)
+    return out
+
+
 def sentences(lines):
     """표 제외 본문 줄을 문장 단위로 쪼갠다. 반환: [(정규화키, 원문)]"""
     out, seen = [], set()
     for l in lines:
         if l.startswith("|") or not l.strip():
             continue
-        for sent in re.split(r"(?<=[.다])\s+(?=[^\s])", l.strip()):
+        for sent in re.split(r"(?<=[.다])\s+(?=[^\s])|(?<=다\.)(?=[가-힣(])", l.strip()):
             sent = sent.strip()
             if len(sent) < 20:
                 continue
@@ -732,7 +744,7 @@ def main():
             print(f"[경고] {r['report_nm']} 원문 실패: {e}", file=sys.stderr)
             ln = None
         if ln:
-            chain.append((f"{r['year']}.{r['month']:02d}{r['kind']}", ln))
+            chain.append((f"{r['year']}.{r['month']:02d}{r['kind']}", strip_risk(ln)))
     diffs = build_diff(chain)
 
     d = os.path.join(a.out, corp["stock_code"])
