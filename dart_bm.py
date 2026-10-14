@@ -422,6 +422,89 @@ def extract_biz(lines):
     return {"all": sec, "subs": subs}
 
 
+# ---------------------------------------------------------------- 인접 보고서 diff (STEP 2)
+DIFF_KWS = ["수주", "증설", "신규", "계약", "중단", "철수", "인수", "매각", "처분", "취득", "투자", "건조", "도입",
+            "고객", "원가", "가동", "감소", "증가", "확대", "축소", "신설", "개발", "승인", "허가", "임상", "양산", "공급"]
+
+
+def sentences(lines):
+    """표 제외 본문 줄을 문장 단위로 쪼갠다. 반환: [(정규화키, 원문)]"""
+    out, seen = [], set()
+    for l in lines:
+        if l.startswith("|") or not l.strip():
+            continue
+        for sent in re.split(r"(?<=[.다])\s+(?=[^\s])", l.strip()):
+            sent = sent.strip()
+            if len(sent) < 20:
+                continue
+            key = re.sub(r"[\d,\.]+", "#", re.sub(r"\s+", "", sent))  # 숫자만 바뀐 문장은 같은 문장으로 취급
+            if key not in seen:
+                seen.add(key)
+                out.append((key, sent))
+    return out
+
+
+def _tok(s):
+    return set(re.findall(r"[가-힣A-Za-z]{2,}", s))
+
+
+def new_sentences(old_lines, new_lines):
+    """new에만 있는 문장. 숫자 마스킹 일치 또는 단어 집합 유사도 0.8 이상이면 '수정'으로 보고 제외."""
+    old = sentences(old_lines)
+    old_keys = {k for k, _ in old}
+    old_toks = [_tok(t) for _, t in old]
+    res = []
+    for key, sent in sentences(new_lines):
+        if key in old_keys:
+            continue
+        t = _tok(sent)
+        if t and any(len(t & o) / len(t | o) >= 0.8 for o in old_toks if o):
+            continue
+        res.append(sent)
+    return res
+
+
+def diff_score(sent):
+    return sum(sent.count(k) for k in DIFF_KWS)
+
+
+def build_diff(chain):
+    """chain: [(라벨, 줄목록)] 최신 → 과거 순. 인접 쌍별 신규 문장(키워드 점수순). 반환 [(구간라벨, [문장...])]"""
+    out = []
+    for i in range(len(chain) - 1):
+        nl, nlines = chain[i]
+        ol, olines = chain[i + 1]
+        news = new_sentences(olines, nlines)
+        news.sort(key=lambda x: -diff_score(x))
+        out.append((f"{ol} → {nl}", news))
+    return out
+
+
+def diff_card(diffs, budget=800):
+    if not diffs:
+        return ""
+    parts, used = [], 0
+    for n, (lab, news) in enumerate(diffs):
+        take = 4 if n == 0 else 2
+        picked = [x for x in news if diff_score(x) > 0][:take] or news[:1]
+        lines = [f"- {clip(x, 110)}" for x in picked]
+        blk = f"[{lab}] 신규 문장 {len(news)}개 중 핵심\n" + ("\n".join(lines) if lines else f"- (신규 문장 없음)")
+        if used + len(blk) > budget and parts:
+            break
+        parts.append(blk)
+        used += len(blk)
+    return "\n".join(parts)
+
+
+def diff_full(diffs):
+    out = []
+    for lab, news in diffs:
+        out.append(f"===== {lab} (신규 문장 {len(news)}개, 키워드 점수순) =====")
+        out += [f"[{diff_score(x)}] {x}" for x in news]
+        out.append("")
+    return "\n".join(out)
+
+
 # ---------------------------------------------------------------- 카드용 선별
 def split_blocks(lines):
     blocks, cur, cap, prev = [], [], "", ""
@@ -510,7 +593,7 @@ def section(title, parts, fallback=NF):
     return f"## {title}\n{body if body else fallback}\n"
 
 
-def build_card(meta, fin, biz, rows, nlines, latest_biz=None, latest_nm=""):
+def build_card(meta, fin, biz, rows, nlines, latest_biz=None, latest_nm="", diff_md=""):
     subs = biz["subs"] if biz else {}
     allb = split_blocks(biz["all"]) if biz else []
     B = {k: split_blocks(v) for k, v in subs.items()}
@@ -573,17 +656,18 @@ def build_card(meta, fin, biz, rows, nlines, latest_biz=None, latest_nm=""):
                   keyword_lines(B.get("etc", []) or allb,
                                 ["경쟁", "점유율", "진입장벽", "과점", "독점", "대체"], max(2, nlines - 2)))
 
-    s6 = section("6. 바뀐 문구 (인접 보고서 diff)", ["not_implemented (STEP 2에서 구현)"])
+    s6 = section("6. 바뀐 문구 (인접 보고서 신규 문장, 숫자만 바뀐 문장 제외; 전체는 diff.txt)",
+                 [diff_md] if diff_md else [], fallback=f"{NF} (비교할 인접 보고서 없음)")
     s7 = f"## 7. 고정 질문 (BM 판별 체크리스트)\n{QUESTIONS}\n"
 
     parts = [head, fin_block(fin), s1, s2, s21, s3, s4, s5, s5b, s6, s7]
     return "\n".join(p for p in parts if p)
 
 
-def make_card(meta, fin, biz, latest_biz=None, latest_nm=""):
+def make_card(meta, fin, biz, latest_biz=None, latest_nm="", diff_md=""):
     card = ""
     for rows, nlines in [(20, 8), (14, 6), (10, 4), (6, 3)]:
-        card = build_card(meta, fin, biz, rows, nlines, latest_biz, latest_nm)
+        card = build_card(meta, fin, biz, rows, nlines, latest_biz, latest_nm, diff_md)
         if len(card) <= CARD_CHAR_LIMIT:
             break
     else:
@@ -633,10 +717,30 @@ def main():
         if not latest_biz:
             print(f"[경고] 최신 보고서 '사업의 내용' 구간 {NF}", file=sys.stderr)
 
+    # STEP 2: 최근 4개 정기보고서의 사업의 내용 인접 비교
+    chain = []
+    for r in reps[:4]:
+        try:
+            if r["rcept_no"] == annual["rcept_no"] and biz:
+                ln = biz["all"]
+            elif r["rcept_no"] == latest["rcept_no"] and latest_biz:
+                ln = latest_biz["all"]
+            else:
+                b = extract_biz(to_text(fetch_doc(r["rcept_no"])))
+                ln = b["all"] if b else None
+        except RuntimeError as e:
+            print(f"[경고] {r['report_nm']} 원문 실패: {e}", file=sys.stderr)
+            ln = None
+        if ln:
+            chain.append((f"{r['year']}.{r['month']:02d}{r['kind']}", ln))
+    diffs = build_diff(chain)
+
     d = os.path.join(a.out, corp["stock_code"])
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "bm_card.md"), "w", encoding="utf-8") as f:
-        f.write(make_card(meta, fin, biz, latest_biz, latest["report_nm"]))
+        f.write(make_card(meta, fin, biz, latest_biz, latest["report_nm"], diff_card(diffs)))
+    with open(os.path.join(d, "diff.txt"), "w", encoding="utf-8") as f:
+        f.write(diff_full(diffs) if diffs else NF)
     with open(os.path.join(d, "biz_full.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(biz["all"]) if biz else NF)
     if latest_biz:
