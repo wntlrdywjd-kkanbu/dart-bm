@@ -79,20 +79,19 @@ svg .ln { stroke: var(--accent); stroke-width: 2; fill: none; } svg .pt { fill: 
   <header class="top">
     <div>
       <h1>BM 대시보드</h1>
-      <div class="sub" id="sub">종목 불러오는 중</div>
+      <div class="sub" id="sub">불러오는 중</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button id="btn-save" hidden>HTML로 저장</button>
     </div>
   </header>
-  <section class="card" id="overview"><div class="empty">불러오는 중</div></section>
-  <div id="detail"></div>
+  <div id="detail"><div class="card empty">불러오는 중</div></div>
 </div>
 
 <script>
 (function () {
   var $ = function (s) { return document.querySelector(s); };
-  var stocks = [], sel = null;
+  var cur = null;
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function eok(v) { return v == null ? "–" : Math.round(v / 1e8).toLocaleString("ko-KR"); }
@@ -196,19 +195,6 @@ svg .ln { stroke: var(--accent); stroke-width: 2; fill: none; } svg .pt { fill: 
     };
   }
 
-  // ------- 개요표
-  function renderOverview(list, selCode, clickable) {
-    if (!list.length) return "<div class='empty'>아직 저장된 종목이 없습니다. 종목을 분석하면 이 표에 쌓입니다.</div>";
-    var h = "<h2>종목 개요</h2><div class='scroll'><table><thead><tr><th>종목</th><th>기준 보고서</th><th class='n'>최근분기 매출</th><th class='n'>영업이익</th><th class='n'>영업이익률</th><th class='n'>영업이익 YoY</th><th class='n'>연 영업이익률</th><th class='n'>부채비율</th><th class='n'>연 영업CF</th></tr></thead><tbody>";
-    list.forEach(function (s) {
-      var d = derive(s);
-      var tag = clickable ? " class='row" + (s.code === selCode ? " on" : "") + "' data-code='" + s.code + "' tabindex='0'" : "";
-      var nm = clickable ? esc(s.name) : "<a href='#" + s.code + "'>" + esc(s.name) + "</a>";
-      h += "<tr" + tag + "><td>" + nm + " <span class='code'>" + s.code + "</span></td><td>" + esc(s.latest) + "</td><td class='n'>" + eok(d.lastRev) + "</td><td class='n'>" + eok(d.lastOp) + "</td><td class='n'>" + pct(d.lastOpm) + "</td><td class='n " + cls(d.yoyOp) + "'>" + sgn(d.yoyOp) + "</td><td class='n'>" + pct(d.annOpm) + "</td><td class='n'>" + pct(d.debt, 0) + "</td><td class='n'>" + eok(d.cfo) + "</td></tr>";
-    });
-    return h + "</tbody></table></div><div class='meta'>억원 · 최근분기는 단독 3개월 · 영업이익 YoY는 보고서 직접값 우선 · 부채비율 = 부채총계 ÷ 자본총계(최근 사업연도 말)</div>";
-  }
-
   // ------- 종목 상세
   function annualTable(s) {
     var A = s.annual, ys = A.years, ly = ys.length - 1;
@@ -260,46 +246,30 @@ svg .ln { stroke: var(--accent); stroke-width: 2; fill: none; } svg .pt { fill: 
     return h;
   }
 
-  // ------- 화면 갱신
+  // ------- 화면 갱신: 가장 최근 분석 1종목만 표시(새 분석이 이전 분석을 대체)
   function render() {
-    $("#sub").textContent = stocks.length ? "DART 공시 기반 · 종목 " + stocks.length + "개 · 숫자는 공시값과 코드 계산값" : "DART 공시 기반";
-    $("#overview").innerHTML = renderOverview(stocks, sel, true);
-    var cur = stocks.filter(function (s) { return s.code === sel; })[0];
-    $("#detail").innerHTML = cur ? renderDetail(cur) : "";
-    $("#btn-save").hidden = !(stocks.length && window.__dl);
-    bindRows();
-  }
-  function pick(code) {
-    sel = code;
-    try { history.replaceState(null, "", "#" + code); } catch (e) {}
-    render();
-    var d = $("#detail"); if (d && d.scrollIntoView) d.scrollIntoView({ block: "start", behavior: "smooth" });
-  }
-  function bindRows() {
-    document.querySelectorAll("tr.row").forEach(function (tr) {
-      tr.onclick = function () { pick(tr.getAttribute("data-code")); };
-      tr.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(tr.getAttribute("data-code")); } };
-    });
+    var s = cur;
+    $("#sub").textContent = s ? "최근 분석 · " + s.name + " (" + s.code + ") · 수집 " + String(s.generated_at || "").slice(0, 10) + " · 숫자는 공시값과 코드 계산값" : "DART 공시 기반";
+    $("#detail").innerHTML = s ? renderDetail(s) : "<div class='card empty'>아직 분석 결과가 없습니다. 종목을 분석하면 이 화면이 그 결과로 바뀝니다.</div>";
+    $("#btn-save").hidden = !(s && window.__dl);
   }
 
   // ------- 저장본(HTML) 생성: 스크립트 없이 열리는 정적 문서
   function staticHtml() {
     var css = $("#css").textContent;
-    var body = "<div class='wrap'><header class='top'><div><h1>BM 대시보드</h1><div class='sub'>저장본 " + new Date().toISOString().slice(0, 10) + " · 종목 " + stocks.length + "개</div></div></header><section class='card'>" + renderOverview(stocks, null, false) + "</section>" + stocks.map(renderDetail).join("") + "</div>";
-    return "<!doctype html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>BM 대시보드 (저장본)</title><style>" + css + "</style></head><body>" + body + "</body></html>";
+    var body = "<div class='wrap'><header class='top'><div><h1>BM 대시보드</h1><div class='sub'>" + esc(cur.name) + " (" + cur.code + ") · 저장 " + new Date().toISOString().slice(0, 10) + "</div></div></header>" + renderDetail(cur) + "</div>";
+    return "<!doctype html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>" + esc(cur.name) + " BM 분석 (저장본)</title><style>" + css + "</style></head><body>" + body + "</body></html>";
   }
   $("#btn-save").onclick = function () {
-    if (!window.__dl) return;
-    window.__dl.save({ filename: "bm_dashboard_" + new Date().toISOString().slice(0, 10) + ".html", data: staticHtml() })
+    if (!window.__dl || !cur) return;
+    window.__dl.save({ filename: cur.name + "_" + cur.code + "_BM_" + new Date().toISOString().slice(0, 10) + ".html", data: staticHtml() })
       .catch(function () { /* 거절·미지원은 조용히 무시 */ });
   };
 
-  // ------- 데이터 연결
+  // ------- 데이터 연결: view/current 문서 하나를 구독
   function load(snap) {
-    stocks = snap.docs.map(function (d) { return d.data(); }).filter(function (s) { return s && s.code && s.quarters; })
-      .sort(function (a, b) { return a.name < b.name ? -1 : 1; });
-    var h = (location.hash || "").replace("#", "");
-    if (!sel || !stocks.some(function (s) { return s.code === sel; })) sel = stocks.some(function (s) { return s.code === h; }) ? h : (stocks[0] && stocks[0].code);
+    var d = snap.exists ? snap.data() : null;
+    cur = d && d.code && d.quarters ? d : null;
     render();
   }
   (async function () {
@@ -308,9 +278,9 @@ svg .ln { stroke: var(--accent); stroke-width: 2; fill: none; } svg .pt { fill: 
     } catch (e) { window.__dl = null; }
     try {
       var db = window.claude && await window.claude.use("db");
-      if (!db) { $("#overview").innerHTML = "<div class='empty'>저장소에 연결할 수 없습니다. 로그인한 상태에서 다시 열어 주세요.</div>"; $("#sub").textContent = "연결 안 됨"; return; }
-      db.collection("stocks").onSnapshot(load, function () { $("#overview").innerHTML = "<div class='empty'>종목 데이터를 읽지 못했습니다. 잠시 뒤 다시 열어 주세요.</div>"; });
-    } catch (e) { $("#overview").innerHTML = "<div class='empty'>저장소에 연결할 수 없습니다.</div>"; }
+      if (!db) { $("#detail").innerHTML = "<div class='card empty'>저장소에 연결할 수 없습니다. 로그인한 상태에서 다시 열어 주세요.</div>"; $("#sub").textContent = "연결 안 됨"; return; }
+      db.doc("view/current").onSnapshot(load, function () { $("#detail").innerHTML = "<div class='card empty'>분석 결과를 읽지 못했습니다. 잠시 뒤 다시 열어 주세요.</div>"; });
+    } catch (e) { $("#detail").innerHTML = "<div class='card empty'>저장소에 연결할 수 없습니다.</div>"; }
   })();
 })();
 </script>
