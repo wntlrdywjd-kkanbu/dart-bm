@@ -488,7 +488,7 @@ def sentences(lines):
             continue
         for sent in re.split(r"(?<=[.다])\s+(?=[^\s])|(?<=다\.)(?=[가-힣(])", l.strip()):
             sent = sent.strip()
-            if len(sent) < 20 or "참고하시기" in sent:
+            if len(sent) < 20 or "참고하시기" in sent or sent.startswith("그 밖에"):
                 continue
             key = re.sub(r"[\d,\.]+", "#", re.sub(r"\s+", "", sent))  # 숫자만 바뀐 문장은 같은 문장으로 취급
             if key not in seen:
