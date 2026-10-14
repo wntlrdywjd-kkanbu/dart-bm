@@ -305,7 +305,7 @@ def pick_tables(blocks, kws, maxn, maxrows, exclude=(), rowclip=160):
     for b in blocks:
         if b["type"] != "table" or len(b["rows"]) < 2:
             continue
-        if norm(b["rows"][0].strip("| ").split("|")[0]).startswith("주"):
+        if re.match(r"^주\d*\)", norm(b["rows"][0].strip("| ").split("|")[0])):
             continue  # '주) ...' 각주 표 제외
         joined = " ".join(b["rows"])
         if not any(k in joined for k in kws):
