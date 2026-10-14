@@ -27,8 +27,8 @@ warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 API = "https://opendart.fss.or.kr/api"
 KEY = os.environ.get("DART_API_KEY", "").strip()
 NF = "not_found"
-# 한글은 대략 1.5~2자/토큰 -> 5000자 ~= 2.5~3k 토큰
-CARD_CHAR_LIMIT = 5000
+# 한글은 대략 1.5~2자/토큰 -> 5500자 ~= 3k 토큰 안팎
+CARD_CHAR_LIMIT = 5500
 
 
 # ---------------------------------------------------------------- HTTP
@@ -297,21 +297,31 @@ def clip(s, n):
     return s if len(s) <= n else s[:n] + "…"
 
 
-def pick_tables(blocks, kws, maxn, maxrows):
+SKIP_ROWS = {"자산", "부채"}  # 세그먼트 표의 자산/부채 행은 BM 판단에 불필요
+
+
+def pick_tables(blocks, kws, maxn, maxrows, exclude=(), rowclip=160):
     out = []
     for b in blocks:
         if b["type"] != "table" or len(b["rows"]) < 2:
             continue
+        if norm(b["rows"][0].strip("| ").split("|")[0]).startswith("주"):
+            continue  # '주) ...' 각주 표 제외
         joined = " ".join(b["rows"])
         if not any(k in joined for k in kws):
             continue
+        rows = [r for r in b["rows"]
+                if norm(r.strip("| ").split("|")[0]) not in SKIP_ROWS]
         part = []
         if b["caption"] and len(b["caption"]) <= 80:
             part.append(f"*{b['caption']}*")
-        part += [clip(r, 160) for r in b["rows"][:maxrows]]
-        if len(b["rows"]) > maxrows:
-            part.append(f"(… {len(b['rows']) - maxrows}행 생략, 원문은 biz_full.txt)")
-        out.append("\n".join(part))
+        part += [clip(r, rowclip) for r in rows[:maxrows]]
+        if len(rows) > maxrows:
+            part.append(f"(… {len(rows) - maxrows}행 생략, 원문은 biz_full.txt)")
+        text = "\n".join(part)
+        if text in exclude:
+            continue
+        out.append(text)
         if len(out) >= maxn:
             break
     return out
@@ -367,25 +377,30 @@ def build_card(meta, fin, biz, rows, nlines):
                  [first_paragraph(B.get("overview", allb))])
 
     # 제품/부문별 매출·비중 표는 보통 '주요 제품 및 서비스'에 있음 -> 먼저 보고, 없으면 '매출 및 수주상황'
-    t2 = (pick_tables(B.get("products", []), ["비중", "%", "매출액"], 2, rows)
-          or pick_tables(sales, ["비중", "%", "매출액"], 2, rows))
+    t2 = (pick_tables(B.get("products", []), ["비율", "비중", "%", "매출액"], 2, rows)
+          or pick_tables(sales, ["비율", "비중", "%", "매출액"], 2, rows))
     s2 = section("2. 매출 구성 (표 원문, 단위는 표 캡션 확인)", t2)
 
-    t3 = [t for t in pick_tables(sales, ["매출처", "수출", "내수"], 2, rows) if t not in t2][:1]
+    t3 = pick_tables(sales, ["매출처", "수출", "내수"], 2, rows, exclude=t2)[:1]
     s3 = section("3. 고객·판매 구조",
                  keyword_lines(sales, ["판매경로", "판매방법", "판매전략", "주요 매출처", "주요매출처",
                                        "수출", "내수", "직판", "대리점", "장기계약", "COA", "CVC", "거래처"], nlines)
                  + t3)
 
+    t4 = pick_tables(mats, ["매입액", "매입유형", "원재료"], 1, rows)
     s4 = section("4. 원가 구조",
-                 keyword_lines(mats, ["원재료", "매입", "가격변동", "주요 원자재", "연료", "벙커"], nlines)
-                 + pick_tables(mats, ["원재료", "매입", "품목"], 1, rows))
+                 keyword_lines(mats, ["원재료", "매입", "가격변동", "주요 원자재", "연료", "벙커"], nlines) + t4)
 
-    fleet_kws = ["선박", "선대", "척", "DWT", "dwt", "용선", "보유", "생산능력", "가동률", "CAPA", "Capa", "설비"]
-    t5 = pick_tables(mats, fleet_kws, 2, rows) or pick_tables(allb, ["DWT", "dwt", "척", "생산능력", "가동률"], 2, rows)
-    s5 = section("5. 생산·설비·R&D (선대/CAPA 표는 없으면 not_found)",
-                 t5 + keyword_lines(rnd, ["연구개발비용", "연구개발", "R&D", "수주", "계약"], max(2, nlines - 2))
-                 + pick_tables(rnd, ["연구개발"], 1, rows))
+    cap_kws = ["생산능력", "운항가능일수", "가동률", "CAPA", "Capa", "선대", "DWT", "dwt", "용선", "신설", "투자대상"]
+    t5 = (pick_tables(mats, cap_kws, 3, rows, exclude=t4)
+          or pick_tables(allb, ["DWT", "dwt", "생산능력", "가동률"], 2, rows, exclude=t4))
+    t5c = pick_tables(rnd, ["선박건조", "장기운송", "주요계약", "공급계약"], 1, rows, rowclip=330)
+    fleet_note = []
+    if not any(re.search(r"\|\s*(선종|선박명|보유\s*척수)", t) for t in t5 + t4):
+        fleet_note = [f"- 선종별 척수·보유/용선 구분 표: {NF} (이 보고서의 사업의 내용 기준)"]
+    s5 = section("5. 생산·설비·계약·R&D",
+                 t5 + fleet_note + t5c
+                 + keyword_lines(rnd, ["연구개발비용", "연구개발", "R&D"], max(1, nlines - 4)))
 
     s6 = section("6. 전년 대비 바뀐 문구", ["not_implemented (STEP 2에서 구현)"])
     s7 = f"## 7. 고정 질문 (BM 판별 체크리스트)\n{QUESTIONS}\n"
