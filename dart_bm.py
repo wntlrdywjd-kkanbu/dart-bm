@@ -197,12 +197,24 @@ FIN_ITEMS = [
     ("자본총계", ("BS",), ["자본총계"]),
 ]
 FLOWS = [x[0] for x in FIN_ITEMS[:3]]
+# 대시보드/fin.json 전용 추가 항목 (카드 표에는 넣지 않음)
+EXTRA_ITEMS = [
+    ("영업활동현금흐름", ("CF",), ["영업활동현금흐름", "영업활동으로인한현금흐름", "영업활동순현금흐름"]),
+    ("투자활동현금흐름", ("CF",), ["투자활동현금흐름", "투자활동으로인한현금흐름", "투자활동순현금흐름"]),
+    ("재무활동현금흐름", ("CF",), ["재무활동현금흐름", "재무활동으로인한현금흐름", "재무활동순현금흐름"]),
+    ("현금및현금성자산", ("BS",), ["현금및현금성자산"]),
+    ("재고자산", ("BS",), ["재고자산"]),
+    ("매출채권", ("BS",), ["매출채권", "매출채권및기타채권", "매출채권및기타유동채권"]),
+    ("유동자산", ("BS",), ["유동자산"]),
+    ("유동부채", ("BS",), ["유동부채"]),
+    ("매출총이익", ("IS", "CIS"), ["매출총이익", "매출총이익(손실)"]),
+]
 
 
 def pick_fin(rows):
     """당기/전기 = thstrm/frmtrm_amount, 당기누적/전기누적 = *_add_amount (분기·반기 보고서에서 3개월 vs 누적 구분용)"""
     out = {}
-    for label, divs, cands in FIN_ITEMS:
+    for label, divs, cands in FIN_ITEMS + EXTRA_ITEMS:
         found = None
         for cand in cands:
             for r in rows:
@@ -211,6 +223,7 @@ def pick_fin(rows):
                              "전기": to_int(r.get("frmtrm_amount")),
                              "당기누적": to_int(r.get("thstrm_add_amount")),
                              "전기누적": to_int(r.get("frmtrm_add_amount")),
+                             "전전기": to_int(r.get("bfefrmtrm_amount")),
                              "account_nm": r.get("account_nm")}
                     break
             if found:
@@ -235,7 +248,7 @@ def cum(it):
     return it["당기누적"] if it.get("당기누적") is not None else it["당기"]
 
 
-def build_quarters(periods, latest_key, fy_end=12, n=4):
+def build_quarters(periods, latest_key, fy_end=12, n=8):
     """periods: {(연,월): {항목: pick_fin 결과}} -> 최근 n개 분기 단독 값(원 단위). 최신 분기부터."""
     out, key = [], latest_key
     for _ in range(n):
@@ -290,7 +303,7 @@ def collect_fin(corp_code, reps):
     need = [ak]
     if fy_end == 12:
         key = lk
-        for _ in range(4):
+        for _ in range(8):
             need.append(key)
             if qnum(key[1], fy_end) > 1:
                 need.append(prev_period(*key))
@@ -325,7 +338,7 @@ def eok(v):
 
 
 def quarter_block(fin):
-    qs = fin.get("quarters") or []
+    qs = (fin.get("quarters") or [])[:4]  # 카드는 4개 분기만(8개 분기는 fin.json/대시보드)
     if not qs:
         return ""
     lines = [f"### 최근 4개 분기 (단독, 억원, {fin['basis']}; 4Q=연간-3Q누적 계산값)",
@@ -463,8 +476,27 @@ def extract_biz(lines):
     return {"all": sec, "subs": subs}
 
 
+ORDER_KWS = ["수주잔고", "수주총액", "수주일자", "수주 잔고", "기납품액", "납기", "계약금액", "수주상황"]
+
+
+def order_tables(biz, maxn=3, maxrows=25):
+    """수주 현황 표(수주잔고·수주총액 등)를 원문 그대로 추출. 없으면 빈 리스트."""
+    if not biz:
+        return []
+    out = []
+    for b in split_blocks(biz["all"]):
+        if b["type"] != "table" or len(b["rows"]) < 2:
+            continue
+        head = " ".join(b["rows"][:2]) + " " + (b.get("caption") or "")
+        if any(k in head for k in ORDER_KWS) and not re.match(r"^주\d*\)", norm(b["rows"][0].strip("| ").split("|")[0])):
+            out.append({"caption": clip(b.get("caption") or "", 120), "rows": [clip(r, 200) for r in b["rows"][:maxrows]]})
+        if len(out) >= maxn:
+            break
+    return out
+
+
 # ---------------------------------------------------------------- 최근 주요 공시 (자금조달·계약 등)
-DISC_RE = re.compile(r"유상증자|무상증자|전환사채|신주인수권|전환가액|전환주식|교환사채|자기주식|합병|분할|양수|양도|"
+DISC_RE = re.compile(r"자기주식|주식소각|소각|배당|유상증자|무상증자|전환사채|신주인수권|전환가액|전환주식|교환사채|자기주식|합병|분할|양수|양도|"
                      r"단일판매|공급계약|시설투자|신규시설|타법인|출자|감자|횡령|소송|회생|불성실|투자판단관련|조회공시|영업정지")
 
 
@@ -853,6 +885,10 @@ def main():
         print(f"[경고] 공시 수집 실패: {e}", file=sys.stderr)
         discs = []
     disc_md = disc_block(discs)
+    orders = {"annual": {"report": annual["report_nm"], "tables": order_tables(biz)},
+              "latest": {"report": latest["report_nm"], "tables": order_tables(latest_biz)}}
+    with open(os.path.join(d, "orders.json"), "w", encoding="utf-8") as f:
+        json.dump(orders, f, ensure_ascii=False, indent=1)
     with open(os.path.join(d, "bm_card.md"), "w", encoding="utf-8") as f:
         f.write(make_card(meta, fin, biz, latest_biz, latest["report_nm"], diff_card(diffs), disc_md))
     with open(os.path.join(d, "diff.txt"), "w", encoding="utf-8") as f:
