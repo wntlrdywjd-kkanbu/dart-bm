@@ -231,8 +231,12 @@ def latest_yoy(periods, key, fy_end=12):
     out = {}
     for label in FLOWS:
         it = cur.get(label)
-        if it and (q == 1 or it.get("당기누적") is not None) and it["당기"] is not None and it["전기"]:
-            out[label] = (it["당기"] - it["전기"]) / abs(it["전기"]) * 100
+        prev = it.get("전기") if it else None
+        if prev is None:  # 반기 등: 전기(3개월) 미제공 → 전년 동일 보고서의 당기(3개월) 사용
+            py = periods.get((key[0] - 1, key[1]), {}).get(label)
+            prev = py.get("당기") if py else None
+        if it and (q == 1 or it.get("당기누적") is not None) and it["당기"] is not None and prev:
+            out[label] = (it["당기"] - prev) / abs(prev) * 100
     return out
 
 
@@ -250,6 +254,7 @@ def collect_fin(corp_code, reps):
             if qnum(key[1], fy_end) > 1:
                 need.append(prev_period(*key))
             key = prev_period(*key)
+    need.append((lk[0] - 1, lk[1]))  # 전년동기 3개월 값(YoY용)
     periods, basis_by_key, div0, seen = {}, {}, None, set()
     for key in need:
         if key in seen or key not in by_key:
