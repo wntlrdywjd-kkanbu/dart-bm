@@ -56,6 +56,10 @@ def build(code):
         "annual": annual, "quarters": quarters, "yoy_latest": fin.get("yoy_latest") or {},
         "secs": secs, "orders": orders,
     }
+    try:  # Claude가 쓴 해석 메모(있으면 대시보드에 표시)
+        doc["notes"] = json.load(open(os.path.join(base, "notes.json"), encoding="utf-8"))
+    except OSError:
+        pass
     s = json.dumps(doc, ensure_ascii=False)
     assert len(s.encode("utf-8")) < 240_000, f"{code}: {len(s)} bytes"
     json.dump(doc, open(os.path.join(base, "dash.json"), "w", encoding="utf-8"), ensure_ascii=False)

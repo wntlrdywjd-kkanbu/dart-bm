@@ -494,13 +494,17 @@ def order_tables(biz, maxn=3, maxrows=25):
     """수주 현황 표(수주잔고·수주총액 등)를 원문 그대로 추출. 없으면 빈 리스트."""
     if not biz:
         return []
-    out = []
+    out, prev = [], None
     for b in split_blocks(biz["all"]):
+        pb, prev = prev, b
         if b["type"] != "table" or len(b["rows"]) < 2:
             continue
         head = " ".join(b["rows"][:2]) + " " + (b.get("caption") or "")
+        unit = ""
+        if pb and pb["type"] == "table" and len(pb["rows"]) == 1 and "단위" in pb["rows"][0]:
+            unit = re.sub(r"[|\s]+", " ", pb["rows"][0]).strip()  # 표 바로 앞 '(단위 : US$1,000)' 한 줄 표
         if any(k in head for k in ORDER_KWS) and not re.match(r"^주\d*\)", norm(b["rows"][0].strip("| ").split("|")[0])):
-            out.append({"caption": clip(b.get("caption") or "", 120), "rows": [clip(r, 200) for r in b["rows"][:maxrows]]})
+            out.append({"caption": clip(b.get("caption") or "", 120), "unit": unit, "rows": [clip(r, 200) for r in b["rows"][:maxrows]]})
         if len(out) >= maxn:
             break
     return out
