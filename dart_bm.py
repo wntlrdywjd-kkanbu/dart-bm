@@ -228,6 +228,17 @@ def pick_fin(rows):
                     break
             if found:
                 break
+        if not found and label == "매출액":  # 계정명이 표준과 다른 보고서: IS 첫 '수익/매출' 계열 행으로 대체
+            for r in rows:
+                nm = norm(r.get("account_nm"))
+                if r.get("sj_div") in divs and re.search(r"(매출액|영업수익|^수익|^매출$)", nm) and not re.search(r"원가|총이익|채권|비용|손익", nm):
+                    found = {"당기": to_int(r.get("thstrm_amount")), "전기": to_int(r.get("frmtrm_amount")),
+                             "당기누적": to_int(r.get("thstrm_add_amount")), "전기누적": to_int(r.get("frmtrm_add_amount")),
+                             "전전기": to_int(r.get("bfefrmtrm_amount")), "account_nm": r.get("account_nm")}
+                    break
+            if not found:
+                names = [r.get("account_nm") for r in rows if r.get("sj_div") in divs][:12]
+                print(f"[경고] 매출액 계정 못 찾음. IS 계정 후보: {names}", file=sys.stderr)
         out[label] = found
     return out
 
@@ -708,7 +719,13 @@ def keyword_lines(blocks, kws, maxn):
     return out
 
 
+BIZ_SENT = re.compile(r"(당사|회사|동사)[는은가이].{0,80}(영위|제조|판매|생산|설계|공급|개발|운영|제공|사업)")
+
+
 def first_paragraph(blocks, n=350):
+    for b in blocks:  # 시장 해설보다 '당사는 ~ 사업을 영위' 류 문장을 우선
+        if b["type"] == "text" and len(b["text"]) >= 40 and BIZ_SENT.search(b["text"][:200]):
+            return clip(b["text"], n)
     for b in blocks:
         if b["type"] == "text" and len(b["text"]) >= 40:
             return clip(b["text"], n)
