@@ -27,8 +27,8 @@ warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 API = "https://opendart.fss.or.kr/api"
 KEY = os.environ.get("DART_API_KEY", "").strip()
 NF = "not_found"
-# 한글은 대략 1.5~2자/토큰 -> 5500자 ~= 3k 토큰 안팎
-CARD_CHAR_LIMIT = 5500
+# 한글은 대략 1.5~2자/토큰 -> 6500자 ~= 3~4k 토큰 (분기 표·최신 보고서 수치 추가로 상향)
+CARD_CHAR_LIMIT = 6500
 
 
 # ---------------------------------------------------------------- HTTP
@@ -86,26 +86,53 @@ def resolve(query, corps):
 
 
 # ---------------------------------------------------------------- 보고서 조회
-def find_report(corp_code):
+PERIODIC_RE = re.compile(r"(사업|반기|분기)보고서\s*\((\d{4})\.(\d{2})\)")
+
+
+def list_periodic(corp_code):
+    """최근 3년 정기보고서(사업/반기/분기)를 기간별 1건(정정본 포함 최신 접수)으로 정리. 최신 기간 순."""
     today = datetime.date.today()
     bgn = today - datetime.timedelta(days=365 * 3)
     rows, page, total = [], 1, 1
     while page <= total and page <= 10:
         j = get_json("list.json", corp_code=corp_code,
                      bgn_de=bgn.strftime("%Y%m%d"), end_de=today.strftime("%Y%m%d"),
-                     pblntf_ty="A", pblntf_detail_type="A001", page_count=100, page_no=page)
+                     pblntf_ty="A", page_count=100, page_no=page)
         rows += j.get("list") or []
         total = int(j.get("total_page") or 1)
         page += 1
-    # API 필터가 느슨할 수 있어 보고서명으로 한 번 더 거른다 (반기/분기/자율공시 제외)
-    rows = [r for r in rows if re.search(r"사업보고서\s*\(\d{4}\.\d{2}\)", r.get("report_nm", ""))]
-    if not rows:
-        raise RuntimeError("사업보고서 없음 (최근 3년 내 조회 결과에 '사업보고서 (YYYY.MM)' 없음)")
-    rows.sort(key=lambda r: (r.get("rcept_dt", ""), r.get("rcept_no", "")), reverse=True)
-    rep = rows[0]
-    m = re.search(r"\((\d{4})\.\d{2}\)", rep.get("report_nm", ""))
-    rep["bsns_year"] = int(m.group(1)) if m else int(rep["rcept_dt"][:4]) - 1
-    return rep
+    best = {}
+    for r in rows:
+        m = PERIODIC_RE.search(r.get("report_nm", ""))
+        if not m:
+            continue  # 자율공시·기타 공시 제외
+        key = (int(m.group(2)), int(m.group(3)))
+        r = dict(r, kind=m.group(1), year=key[0], month=key[1])
+        if key not in best or (r["rcept_dt"], r["rcept_no"]) > (best[key]["rcept_dt"], best[key]["rcept_no"]):
+            best[key] = r
+    reps = [best[k] for k in sorted(best, reverse=True)]
+    if not any(r["kind"] == "사업" for r in reps):
+        raise RuntimeError("사업보고서 없음 (최근 3년 내 정기보고서 목록에 '사업보고서 (YYYY.MM)' 없음)")
+    return reps
+
+
+def qnum(month, fy_end=12):
+    """결산월(fy_end) 기준 분기 번호: 12월 결산이면 3월=1, 6월=2, 9월=3, 12월=4"""
+    rem = (month - fy_end) % 12
+    return rem // 3 if rem else 4
+
+
+def prev_period(y, m):
+    m -= 3
+    return (y - 1, m + 12) if m <= 0 else (y, m)
+
+
+def reprt_code(r, fy_end=12):
+    if r["kind"] == "사업":
+        return "11011"
+    if r["kind"] == "반기":
+        return "11012"
+    return "11013" if qnum(r["month"], fy_end) == 1 else "11014"
 
 
 # ---------------------------------------------------------------- 재무
@@ -128,9 +155,11 @@ FIN_ITEMS = [
     ("부채총계", ("BS",), ["부채총계"]),
     ("자본총계", ("BS",), ["자본총계"]),
 ]
+FLOWS = [x[0] for x in FIN_ITEMS[:3]]
 
 
 def pick_fin(rows):
+    """당기/전기 = thstrm/frmtrm_amount, 당기누적/전기누적 = *_add_amount (분기·반기 보고서에서 3개월 vs 누적 구분용)"""
     out = {}
     for label, divs, cands in FIN_ITEMS:
         found = None
@@ -139,6 +168,8 @@ def pick_fin(rows):
                 if r.get("sj_div") in divs and norm(r.get("account_nm")) == norm(cand):
                     found = {"당기": to_int(r.get("thstrm_amount")),
                              "전기": to_int(r.get("frmtrm_amount")),
+                             "당기누적": to_int(r.get("thstrm_add_amount")),
+                             "전기누적": to_int(r.get("frmtrm_add_amount")),
                              "account_nm": r.get("account_nm")}
                     break
             if found:
@@ -147,24 +178,137 @@ def pick_fin(rows):
     return out
 
 
-def fetch_fin(corp_code, year):
-    for div, basis in (("CFS", "연결"), ("OFS", "별도")):
+def fetch_period(corp_code, year, code, bases=("CFS", "OFS")):
+    for div in bases:
         j = get_json("fnlttSinglAcntAll.json", corp_code=corp_code,
-                     bsns_year=str(year), reprt_code="11011", fs_div=div)
+                     bsns_year=str(year), reprt_code=code, fs_div=div)
         if j.get("status") == "000" and j.get("list"):
-            return {"basis": basis, "year": year, "unit": "원", "items": pick_fin(j["list"])}
-    return {"basis": NF, "year": year, "unit": "원", "items": {}}
+            return {"basis": "연결" if div == "CFS" else "별도", "div": div, "items": pick_fin(j["list"])}
+    return None
+
+
+def cum(it):
+    """누적값: 누적 필드가 있으면 그것, 없으면 당기 값(1Q·사업보고서는 이미 누적과 같음)"""
+    if not it:
+        return None
+    return it["당기누적"] if it.get("당기누적") is not None else it["당기"]
+
+
+def build_quarters(periods, latest_key, fy_end=12, n=4):
+    """periods: {(연,월): {항목: pick_fin 결과}} -> 최근 n개 분기 단독 값(원 단위). 최신 분기부터."""
+    out, key = [], latest_key
+    for _ in range(n):
+        y, m = key
+        q = qnum(m, fy_end)
+        cur = periods.get(key)
+        prev = periods.get(prev_period(y, m)) if q > 1 else None
+        vals, how, check = {}, "-", ""
+        for label in FLOWS:
+            c = cur.get(label) if cur else None
+            v = None
+            if c is not None:
+                if q == 1:
+                    v, how = cum(c), "직접"
+                elif prev and prev.get(label) and cum(c) is not None and cum(prev[label]) is not None:
+                    v, how = cum(c) - cum(prev[label]), "누적차"
+                    d = c.get("당기") if (q in (2, 3) and c.get("당기누적") is not None) else None
+                    if d is not None and abs(v - d) > max(1, abs(d) * 0.005):
+                        check = "불일치"
+                elif q in (2, 3) and c.get("당기누적") is not None:
+                    v, how = c["당기"], "직접"
+            vals[label] = v
+        out.append({"key": f"{y}.{m:02d}", "label": f"{y % 100}.{q}Q", "values": vals, "how": how, "check": check})
+        key = prev_period(y, m)
+    return out
+
+
+def latest_yoy(periods, key, fy_end=12):
+    """최신 분기의 전년동기 대비(%). 보고서가 직접 주는 3개월 값끼리만 비교(4Q는 제외)."""
+    cur = periods.get(key)
+    q = qnum(key[1], fy_end)
+    if not cur or q == 4:
+        return {}
+    out = {}
+    for label in FLOWS:
+        it = cur.get(label)
+        if it and (q == 1 or it.get("당기누적") is not None) and it["당기"] is not None and it["전기"]:
+            out[label] = (it["당기"] - it["전기"]) / abs(it["전기"]) * 100
+    return out
+
+
+def collect_fin(corp_code, reps):
+    fy_end = next(r for r in reps if r["kind"] == "사업")["month"]
+    annual = next(r for r in reps if r["kind"] == "사업")
+    latest = reps[0]
+    by_key = {(r["year"], r["month"]): r for r in reps}
+    ak, lk = (annual["year"], annual["month"]), (latest["year"], latest["month"])
+    need = [ak]
+    if fy_end == 12:
+        key = lk
+        for _ in range(4):
+            need.append(key)
+            if qnum(key[1], fy_end) > 1:
+                need.append(prev_period(*key))
+            key = prev_period(*key)
+    periods, basis_by_key, div0, seen = {}, {}, None, set()
+    for key in need:
+        if key in seen or key not in by_key:
+            continue
+        seen.add(key)
+        r = by_key[key]
+        bases = (div0, "OFS" if div0 == "CFS" else "CFS") if div0 else ("CFS", "OFS")
+        res = fetch_period(corp_code, r["year"], reprt_code(r, fy_end), bases)
+        if res:
+            periods[key] = res["items"]
+            basis_by_key[key] = res["basis"]
+            div0 = div0 or res["div"]
+    ann = periods.get(ak)
+    fin = {"basis": basis_by_key.get(ak, NF), "year": annual["year"], "unit": "원",
+           "items": ann or {}, "quarters": [], "yoy_latest": {}, "latest_period": f"{lk[0]}.{lk[1]:02d}"}
+    if fy_end == 12:
+        fin["quarters"] = build_quarters(periods, lk, fy_end)
+        fin["yoy_latest"] = latest_yoy(periods, lk, fy_end)
+    if len(set(basis_by_key.values())) > 1:
+        fin["note"] = f"연결/별도 혼재: {basis_by_key}"
+    fin["periods_raw"] = {f"{k[0]}.{k[1]:02d}": v for k, v in periods.items()}
+    return fin
 
 
 def eok(v):
     return NF if v is None else f"{v / 1e8:,.0f}"
 
 
+def quarter_block(fin):
+    qs = fin.get("quarters") or []
+    if not qs:
+        return ""
+    lines = [f"### 최근 4개 분기 (단독, 억원, {fin['basis']}; 4Q=연간-3Q누적 계산값)",
+             "| 항목 | " + " | ".join(q["label"] for q in qs) + " |",
+             "| --- |" + " --- |" * len(qs)]
+    for label in FLOWS:
+        lines.append(f"| {label} | " + " | ".join(eok(q["values"].get(label)) for q in qs) + " |")
+    opm = []
+    for q in qs:
+        r, o = q["values"].get("매출액"), q["values"].get("영업이익")
+        opm.append(f"{o / r * 100:.1f}%" if r and o is not None else "-")
+    lines.append("| 영업이익률(계산) | " + " | ".join(opm) + " |")
+    yoy = fin.get("yoy_latest") or {}
+    if yoy:
+        lines.append(f"- {qs[0]['label']} 전년동기 대비(보고서 직접값): "
+                     + ", ".join(f"{k} {v:+.1f}%" for k, v in yoy.items()))
+    bad = [q["label"] for q in qs if q.get("check")]
+    if bad:
+        lines.append(f"- 주의: 누적차 계산과 보고서 직접값이 다른 분기 {bad} (정정·회계변경 가능성, 원문 확인)")
+    if fin.get("note"):
+        lines.append(f"- 주의: {fin['note']}")
+    return "\n".join(lines) + "\n"
+
+
 def fin_block(fin):
     if fin["basis"] == NF:
         return f"## 0. 재무 요약\n재무제표 API 응답 {NF}\n"
     y = fin["year"]
-    lines = [f"## 0. 재무 요약 ({fin['basis']}, 단위 억원, FY{y} vs FY{y - 1})",
+    lines = [f"## 0. 재무 요약 ({fin['basis']}, 단위 억원, 연간 FY{y} vs FY{y - 1})",
              "| 항목 | 당기 | 전기 | 증감% |", "| --- | --- | --- | --- |"]
     for label, _, _ in FIN_ITEMS:
         it = fin["items"].get(label)
@@ -177,7 +321,7 @@ def fin_block(fin):
     rev, op = fin["items"].get("매출액"), fin["items"].get("영업이익")
     if rev and op and rev["당기"] and op["당기"] is not None:
         lines.append(f"- 영업이익률(계산: 영업이익/매출액): {op['당기'] / rev['당기'] * 100:.1f}%")
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines) + "\n" + quarter_block(fin)
 
 
 # ---------------------------------------------------------------- 원문
@@ -361,25 +505,39 @@ def section(title, parts, fallback=NF):
     return f"## {title}\n{body if body else fallback}\n"
 
 
-def build_card(meta, fin, biz, rows, nlines):
+def build_card(meta, fin, biz, rows, nlines, latest_biz=None, latest_nm=""):
     subs = biz["subs"] if biz else {}
     allb = split_blocks(biz["all"]) if biz else []
     B = {k: split_blocks(v) for k, v in subs.items()}
     sales = B.get("sales", [])
     mats = B.get("materials", [])
     rnd = B.get("rnd", [])
+    cap_kws = ["생산능력", "운항가능일수", "가동률", "CAPA", "Capa", "선대", "DWT", "dwt", "용선", "신설", "투자대상"]
 
     head = (f"# {meta['corp_name']} ({meta['stock_code']}) BM 카드\n"
-            f"- 출처: DART {meta['report_nm']} / 접수번호 {meta['rcept_no']} / 접수일 {meta['rcept_dt']}\n"
-            f"- 아래는 사업보고서 원문 발췌(기업 서술 포함)와 코드 계산값이며 해석 아님. 미확인 값은 {NF}.\n")
+            f"- BM 서술 출처: DART {meta['report_nm']} / 접수번호 {meta['rcept_no']} / 접수일 {meta['rcept_dt']}\n")
+    if meta.get("latest_report_nm") and meta["latest_report_nm"] != meta["report_nm"]:
+        head += (f"- 최신 정기보고서(분기 재무·부문 수치): {meta['latest_report_nm']} / "
+                 f"접수번호 {meta['latest_rcept_no']} / 접수일 {meta['latest_rcept_dt']}\n")
+    head += f"- 아래는 공시 원문 발췌(기업 서술 포함)와 코드 계산값이며 해석 아님. 미확인 값은 {NF}.\n"
+
+    # 최신 정기보고서(반기/분기)의 부문·생산 표
+    lb = split_blocks(latest_biz["all"]) if latest_biz else []
+    tl_sales = pick_tables(lb, ["비율", "비중", "영업이익", "매출액"], 2, rows)
+    tl_cap = pick_tables(lb, cap_kws, 2, rows)
 
     s1 = section("1. 한 줄 사업 정의 (원문 개요 첫 문단, 기업 서술)",
                  [first_paragraph(B.get("overview", allb))])
 
     # 제품/부문별 매출·비중 표는 보통 '주요 제품 및 서비스'에 있음 -> 먼저 보고, 없으면 '매출 및 수주상황'
-    t2 = (pick_tables(B.get("products", []), ["비율", "비중", "%", "매출액"], 2, rows)
-          or pick_tables(sales, ["비율", "비중", "%", "매출액"], 2, rows))
-    s2 = section("2. 매출 구성 (표 원문, 단위는 표 캡션 확인)", t2)
+    n2 = 1 if tl_sales else 2
+    t2 = (pick_tables(B.get("products", []), ["비율", "비중", "%", "매출액"], n2, rows)
+          or pick_tables(sales, ["비율", "비중", "%", "매출액"], n2, rows))
+    s2 = section("2. 매출 구성 (사업보고서 표 원문, 단위는 표 캡션 확인)", t2)
+    s21 = ""
+    if latest_biz is not None:
+        s21 = section(f"2-1. 최신 정기보고서 수치 ({latest_nm})",
+                      [t for t in tl_sales if t not in t2] + tl_cap)
 
     t3 = pick_tables(sales, ["매출처", "내수", "수출액", "지역별"], 2, rows, exclude=t2)[:1]
     s3 = section("3. 고객·판매 구조",
@@ -392,13 +550,15 @@ def build_card(meta, fin, biz, rows, nlines):
     s4 = section("4. 원가 구조",
                  keyword_lines(mats, ["원재료", "매입", "가격변동", "주요 원자재", "연료", "벙커"], nlines) + t4)
 
-    cap_kws = ["생산능력", "운항가능일수", "가동률", "CAPA", "Capa", "선대", "DWT", "dwt", "용선", "신설", "투자대상"]
-    t5 = (pick_tables(mats, cap_kws, 3, rows, exclude=t4)
-          or pick_tables(allb, ["DWT", "dwt", "생산능력", "가동률"], 2, rows, exclude=t4))
+    if tl_cap:
+        t5 = []  # 최신 보고서의 생산·설비 표가 있으면 2-1에서 보여주므로 연간 표는 생략
+    else:
+        t5 = (pick_tables(mats, cap_kws, 3, rows, exclude=t4)
+              or pick_tables(allb, ["DWT", "dwt", "생산능력", "가동률"], 2, rows, exclude=t4))
     t5c = pick_tables(rnd, ["선박건조", "장기운송", "주요계약", "공급계약"], 1, rows, rowclip=330)
     fleet_note = []
     is_ship = sum(l.count("선박") for l in (biz["all"] if biz else [])) > 15
-    if is_ship and not any(re.search(r"\|\s*(선종|선박명|보유\s*척수)", t) for t in t5 + t4):
+    if is_ship and not any(re.search(r"\|\s*(선종|선박명|보유\s*척수)", t) for t in t5 + t4 + tl_cap):
         fleet_note = [f"- 선종별 척수·보유/용선 구분 표: {NF} (이 보고서의 사업의 내용 기준)"]
     s5 = section("5. 생산·설비·계약·R&D",
                  t5 + fleet_note + t5c
@@ -408,16 +568,17 @@ def build_card(meta, fin, biz, rows, nlines):
                   keyword_lines(B.get("etc", []) or allb,
                                 ["경쟁", "점유율", "진입장벽", "과점", "독점", "대체"], max(2, nlines - 2)))
 
-    s6 = section("6. 전년 대비 바뀐 문구", ["not_implemented (STEP 2에서 구현)"])
+    s6 = section("6. 바뀐 문구 (인접 보고서 diff)", ["not_implemented (STEP 2에서 구현)"])
     s7 = f"## 7. 고정 질문 (BM 판별 체크리스트)\n{QUESTIONS}\n"
 
-    return "\n".join([head, fin_block(fin), s1, s2, s3, s4, s5, s5b, s6, s7])
+    parts = [head, fin_block(fin), s1, s2, s21, s3, s4, s5, s5b, s6, s7]
+    return "\n".join(p for p in parts if p)
 
 
-def make_card(meta, fin, biz):
+def make_card(meta, fin, biz, latest_biz=None, latest_nm=""):
     card = ""
     for rows, nlines in [(20, 8), (14, 6), (10, 4), (6, 3)]:
-        card = build_card(meta, fin, biz, rows, nlines)
+        card = build_card(meta, fin, biz, rows, nlines, latest_biz, latest_nm)
         if len(card) <= CARD_CHAR_LIMIT:
             break
     else:
@@ -436,16 +597,21 @@ def main():
 
     corp = resolve(a.query, load_corps())
     print(f"대상: {corp['corp_name']} ({corp['stock_code']}) corp_code={corp['corp_code']}")
-    rep = find_report(corp["corp_code"])
-    print(f"보고서: {rep['report_nm']} rcept_no={rep['rcept_no']} 접수일={rep['rcept_dt']}")
+    reps = list_periodic(corp["corp_code"])
+    annual = next(r for r in reps if r["kind"] == "사업")
+    latest = reps[0]
+    print(f"BM 서술: {annual['report_nm']} / 최신: {latest['report_nm']} (접수일 {latest['rcept_dt']})")
+    print("정기보고서 목록:", ", ".join(f"{r['year']}.{r['month']:02d}{r['kind']}" for r in reps))
 
     meta = {"corp_name": corp["corp_name"], "stock_code": corp["stock_code"],
-            "corp_code": corp["corp_code"], "report_nm": rep["report_nm"],
-            "rcept_no": rep["rcept_no"], "rcept_dt": rep["rcept_dt"],
+            "corp_code": corp["corp_code"], "report_nm": annual["report_nm"],
+            "rcept_no": annual["rcept_no"], "rcept_dt": annual["rcept_dt"],
+            "latest_report_nm": latest["report_nm"], "latest_rcept_no": latest["rcept_no"],
+            "latest_rcept_dt": latest["rcept_dt"],
             "generated_at": datetime.datetime.now().isoformat(timespec="seconds")}
 
-    fin = fetch_fin(corp["corp_code"], rep["bsns_year"])
-    lines = to_text(fetch_doc(rep["rcept_no"]))
+    fin = collect_fin(corp["corp_code"], reps)
+    lines = to_text(fetch_doc(annual["rcept_no"]))
     biz = extract_biz(lines)
     if not biz:
         hints = [l for l in lines if "사업의 내용" in l][:5]
@@ -453,15 +619,29 @@ def main():
     elif not biz["subs"]:
         print(f"[경고] 하위 항목(1.사업의 개요 등) 분리 {NF}. 전체 구간으로 대체.", file=sys.stderr)
 
+    latest_biz = None
+    if latest["rcept_no"] != annual["rcept_no"]:
+        try:
+            latest_biz = extract_biz(to_text(fetch_doc(latest["rcept_no"])))
+        except RuntimeError as e:
+            print(f"[경고] 최신 보고서 원문 실패: {e}", file=sys.stderr)
+        if not latest_biz:
+            print(f"[경고] 최신 보고서 '사업의 내용' 구간 {NF}", file=sys.stderr)
+
     d = os.path.join(a.out, corp["stock_code"])
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, "bm_card.md"), "w", encoding="utf-8") as f:
-        f.write(make_card(meta, fin, biz))
+        f.write(make_card(meta, fin, biz, latest_biz, latest["report_nm"]))
     with open(os.path.join(d, "biz_full.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(biz["all"]) if biz else NF)
+    if latest_biz:
+        with open(os.path.join(d, "biz_latest.txt"), "w", encoding="utf-8") as f:
+            f.write("\n".join(latest_biz["all"]))
+    elif os.path.exists(os.path.join(d, "biz_latest.txt")):
+        os.remove(os.path.join(d, "biz_latest.txt"))
     with open(os.path.join(d, "fin.json"), "w", encoding="utf-8") as f:
         json.dump({"meta": meta, "fin": fin}, f, ensure_ascii=False, indent=2)
-    print(f"완료: {d}/ (bm_card.md, biz_full.txt, fin.json)")
+    print(f"완료: {d}/ (bm_card.md, biz_full.txt, fin.json" + (", biz_latest.txt)" if latest_biz else ")"))
 
 
 if __name__ == "__main__":
