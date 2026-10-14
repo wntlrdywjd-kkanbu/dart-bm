@@ -463,6 +463,57 @@ def extract_biz(lines):
     return {"all": sec, "subs": subs}
 
 
+# ---------------------------------------------------------------- 최근 주요 공시 (자금조달·계약 등)
+DISC_RE = re.compile(r"유상증자|무상증자|전환사채|신주인수권|전환가액|전환주식|교환사채|자기주식|합병|분할|양수|양도|"
+                     r"단일판매|공급계약|시설투자|신규시설|타법인|출자|감자|횡령|소송|회생|불성실|투자판단관련|조회공시|영업정지")
+
+
+def list_disclosures(corp_code, days=200):
+    """주요사항보고(B)·거래소공시(I)·지분공시(D 제외)에서 키워드 해당 공시를 최신순으로."""
+    end = datetime.date.today()
+    bgn = end - datetime.timedelta(days=days)
+    out, seen = [], set()
+    for ty in ("B", "I"):
+        for page in range(1, 6):
+            j = get_json("list.json", corp_code=corp_code, bgn_de=bgn.strftime("%Y%m%d"),
+                         end_de=end.strftime("%Y%m%d"), pblntf_ty=ty, page_no=page, page_count=100)
+            if j.get("status") != "000":
+                break
+            for it in j.get("list", []):
+                nm = it["report_nm"]
+                if DISC_RE.search(nm) and it["rcept_no"] not in seen:
+                    seen.add(it["rcept_no"])
+                    out.append({"rcept_no": it["rcept_no"], "report_nm": nm.strip(), "rcept_dt": it["rcept_dt"]})
+            if page >= int(j.get("total_page", 1) or 1):
+                break
+    out.sort(key=lambda x: (x["rcept_dt"], x["rcept_no"]), reverse=True)
+    return out
+
+
+def save_disclosures(items, d, maxn=8):
+    """핵심 공시 원문(표 포함)을 out/{code}/disc/ 에 저장. 반환: 저장 파일 수."""
+    dd = os.path.join(d, "disc")
+    os.makedirs(dd, exist_ok=True)
+    n = 0
+    for it in items[:maxn]:
+        try:
+            txt = "\n".join(to_text(fetch_doc(it["rcept_no"])))
+        except RuntimeError as e:
+            print(f"[경고] 공시 원문 실패 {it['report_nm']}: {e}", file=sys.stderr)
+            continue
+        with open(os.path.join(dd, f"{it['rcept_dt']}_{it['rcept_no']}.txt"), "w", encoding="utf-8") as f:
+            f.write(f"# {it['report_nm']} / {it['rcept_dt']} / {it['rcept_no']}\n{txt}")
+        n += 1
+    return n
+
+
+def disc_block(items, n=10):
+    if not items:
+        return ""
+    lines = [f"- {it['rcept_dt'][:4]}-{it['rcept_dt'][4:6]}-{it['rcept_dt'][6:]} {it['report_nm']}" for it in items[:n]]
+    return "\n".join(lines)
+
+
 # ---------------------------------------------------------------- 인접 보고서 diff (STEP 2)
 DIFF_KWS = ["유상증자", "전환우선주", "전환사채", "신주", "증자", "조달", "소송", "횡령", "배당", "자사주", "수주", "증설", "신규", "계약", "중단", "철수", "인수", "매각", "처분", "취득", "투자", "건조", "도입",
             "고객", "원가", "가동", "감소", "증가", "확대", "축소", "신설", "개발", "승인", "허가", "임상", "양산", "공급"]
@@ -646,7 +697,7 @@ def section(title, parts, fallback=NF):
     return f"## {title}\n{body if body else fallback}\n"
 
 
-def build_card(meta, fin, biz, rows, nlines, latest_biz=None, latest_nm="", diff_md=""):
+def build_card(meta, fin, biz, rows, nlines, latest_biz=None, latest_nm="", diff_md="", disc_md=""):
     subs = biz["subs"] if biz else {}
     allb = split_blocks(biz["all"]) if biz else []
     B = {k: split_blocks(v) for k, v in subs.items()}
@@ -711,16 +762,18 @@ def build_card(meta, fin, biz, rows, nlines, latest_biz=None, latest_nm="", diff
 
     s6 = section("6. 바뀐 문구 (인접 보고서 신규 문장, 숫자만 바뀐 문장 제외; 전체는 diff.txt)",
                  [diff_md] if diff_md else [], fallback=f"{NF} (비교할 인접 보고서 없음)")
+    s6b = section("6-2. 최근 주요 공시 (증자·사채·계약·자기주식 등, 최근 200일; 원문은 disc/)",
+                  [disc_md] if disc_md else [], fallback="해당 공시 없음")
     s7 = f"## 7. 고정 질문 (BM 판별 체크리스트)\n{QUESTIONS}\n"
 
-    parts = [head, fin_block(fin), s1, s2, s21, s3, s4, s5, s5b, s6, s7]
+    parts = [head, fin_block(fin), s1, s2, s21, s3, s4, s5, s5b, s6, s6b, s7]
     return "\n".join(p for p in parts if p)
 
 
-def make_card(meta, fin, biz, latest_biz=None, latest_nm="", diff_md=""):
+def make_card(meta, fin, biz, latest_biz=None, latest_nm="", diff_md="", disc_md=""):
     card = ""
     for rows, nlines in [(20, 8), (14, 6), (10, 4), (6, 3)]:
-        card = build_card(meta, fin, biz, rows, nlines, latest_biz, latest_nm, diff_md)
+        card = build_card(meta, fin, biz, rows, nlines, latest_biz, latest_nm, diff_md, disc_md)
         if len(card) <= CARD_CHAR_LIMIT:
             break
     else:
@@ -793,8 +846,15 @@ def main():
 
     d = os.path.join(a.out, corp["stock_code"])
     os.makedirs(d, exist_ok=True)
+    try:
+        discs = list_disclosures(corp["corp_code"])
+        print(f"주요 공시 {len(discs)}건, 원문 {save_disclosures(discs, d)}건 저장")
+    except Exception as e:  # 공시 수집 실패가 카드 생성을 막지 않게
+        print(f"[경고] 공시 수집 실패: {e}", file=sys.stderr)
+        discs = []
+    disc_md = disc_block(discs)
     with open(os.path.join(d, "bm_card.md"), "w", encoding="utf-8") as f:
-        f.write(make_card(meta, fin, biz, latest_biz, latest["report_nm"], diff_card(diffs)))
+        f.write(make_card(meta, fin, biz, latest_biz, latest["report_nm"], diff_card(diffs), disc_md))
     with open(os.path.join(d, "diff.txt"), "w", encoding="utf-8") as f:
         f.write(diff_full(diffs) if diffs else NF)
     with open(os.path.join(d, "biz_full.txt"), "w", encoding="utf-8") as f:
