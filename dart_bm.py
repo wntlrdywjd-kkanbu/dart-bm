@@ -6,7 +6,7 @@
 필요:    환경변수 DART_API_KEY
 출력:    out/{종목코드}/bm_card.md, biz_full.txt, fin.json
 """
-import argparse
+import argparse, gzip
 import datetime
 import io
 import json
@@ -66,6 +66,47 @@ def load_corps():
         corps.append({k: (e.findtext(k) or "").strip()
                       for k in ("corp_code", "corp_name", "stock_code")})
     return corps
+
+
+CACHE = "cache"
+
+
+def cached_corp(query):
+    """종목코드 6자리면 캐시된 corp_code 사용 → corpCode.xml(대용량) 다운로드 생략."""
+    q = query.strip()
+    if not re.fullmatch(r"\d{6}", q):
+        return None
+    try:
+        return json.load(open(os.path.join(CACHE, "corp_map.json"), encoding="utf-8")).get(q)
+    except (OSError, ValueError):
+        return None
+
+
+def save_corp(c):
+    os.makedirs(CACHE, exist_ok=True)
+    fp = os.path.join(CACHE, "corp_map.json")
+    try:
+        m = json.load(open(fp, encoding="utf-8"))
+    except (OSError, ValueError):
+        m = {}
+    m[c["stock_code"]] = c
+    json.dump(m, open(fp, "w", encoding="utf-8"), ensure_ascii=False, indent=0)
+
+
+def get_biz(rcept_no):
+    """보고서는 접수번호 단위로 불변 → '사업의 내용' 구간을 캐시(gz). 새 보고서만 DART에서 내려받는다."""
+    fp = os.path.join(CACHE, "biz", f"{rcept_no}.txt.gz")
+    if os.path.exists(fp):
+        try:
+            return extract_biz(gzip.open(fp, "rt", encoding="utf-8").read().split("\n"))
+        except OSError:
+            pass
+    b = extract_biz(to_text(fetch_doc(rcept_no)))
+    if b:
+        os.makedirs(os.path.dirname(fp), exist_ok=True)
+        with gzip.open(fp, "wt", encoding="utf-8") as f:
+            f.write("\n".join(b["all"]))
+    return b
 
 
 def resolve(query, corps):
@@ -447,7 +488,7 @@ def sentences(lines):
             continue
         for sent in re.split(r"(?<=[.다])\s+(?=[^\s])|(?<=다\.)(?=[가-힣(])", l.strip()):
             sent = sent.strip()
-            if len(sent) < 20:
+            if len(sent) < 20 or "참고하시기" in sent:
                 continue
             key = re.sub(r"[\d,\.]+", "#", re.sub(r"\s+", "", sent))  # 숫자만 바뀐 문장은 같은 문장으로 취급
             if key not in seen:
@@ -696,7 +737,12 @@ def main():
     if not KEY:
         sys.exit("DART_API_KEY 환경변수가 비어 있음 (GitHub Secrets 이름 확인)")
 
-    corp = resolve(a.query, load_corps())
+    corp = cached_corp(a.query)
+    if corp:
+        print("corp_code 캐시 사용")
+    else:
+        corp = resolve(a.query, load_corps())
+        save_corp(corp)
     print(f"대상: {corp['corp_name']} ({corp['stock_code']}) corp_code={corp['corp_code']}")
     reps = list_periodic(corp["corp_code"])
     annual = next(r for r in reps if r["kind"] == "사업")
@@ -712,18 +758,16 @@ def main():
             "generated_at": datetime.datetime.now().isoformat(timespec="seconds")}
 
     fin = collect_fin(corp["corp_code"], reps)
-    lines = to_text(fetch_doc(annual["rcept_no"]))
-    biz = extract_biz(lines)
+    biz = get_biz(annual["rcept_no"])
     if not biz:
-        hints = [l for l in lines if "사업의 내용" in l][:5]
-        print(f"[경고] '사업의 내용' 구간 {NF}. 후보 줄: {hints}", file=sys.stderr)
+        print(f"[경고] '사업의 내용' 구간 {NF}", file=sys.stderr)
     elif not biz["subs"]:
         print(f"[경고] 하위 항목(1.사업의 개요 등) 분리 {NF}. 전체 구간으로 대체.", file=sys.stderr)
 
     latest_biz = None
     if latest["rcept_no"] != annual["rcept_no"]:
         try:
-            latest_biz = extract_biz(to_text(fetch_doc(latest["rcept_no"])))
+            latest_biz = get_biz(latest["rcept_no"])
         except RuntimeError as e:
             print(f"[경고] 최신 보고서 원문 실패: {e}", file=sys.stderr)
         if not latest_biz:
@@ -738,7 +782,7 @@ def main():
             elif r["rcept_no"] == latest["rcept_no"] and latest_biz:
                 ln = latest_biz["all"]
             else:
-                b = extract_biz(to_text(fetch_doc(r["rcept_no"])))
+                b = get_biz(r["rcept_no"])
                 ln = b["all"] if b else None
         except RuntimeError as e:
             print(f"[경고] {r['report_nm']} 원문 실패: {e}", file=sys.stderr)
