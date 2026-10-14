@@ -476,7 +476,7 @@ def extract_biz(lines):
     return {"all": sec, "subs": subs}
 
 
-ORDER_KWS = ["수주잔고", "수주총액", "수주일자", "수주 잔고", "기납품액", "납기", "계약금액", "수주상황"]
+ORDER_KWS = ["수주잔고", "수주총액", "수주일자", "수주 잔고", "수주상황", "수주금액", "수주잔액"]
 
 
 def order_tables(biz, maxn=3, maxrows=25):
