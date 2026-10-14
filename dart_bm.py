@@ -381,10 +381,11 @@ def build_card(meta, fin, biz, rows, nlines):
           or pick_tables(sales, ["비율", "비중", "%", "매출액"], 2, rows))
     s2 = section("2. 매출 구성 (표 원문, 단위는 표 캡션 확인)", t2)
 
-    t3 = pick_tables(sales, ["매출처", "수출", "내수"], 2, rows, exclude=t2)[:1]
+    t3 = pick_tables(sales, ["매출처", "내수", "수출액", "지역별"], 2, rows, exclude=t2)[:1]
     s3 = section("3. 고객·판매 구조",
                  keyword_lines(sales, ["판매경로", "판매방법", "판매전략", "주요 매출처", "주요매출처",
-                                       "수출", "내수", "직판", "대리점", "장기계약", "COA", "CVC", "거래처"], nlines)
+                                       "수출", "내수", "직판", "대리점", "장기계약", "COA", "CVC", "거래처",
+                                       "수주", "주문생산", "의존도", "고객사"], nlines)
                  + t3)
 
     t4 = pick_tables(mats, ["매입액", "매입유형", "원재료"], 1, rows)
@@ -396,16 +397,21 @@ def build_card(meta, fin, biz, rows, nlines):
           or pick_tables(allb, ["DWT", "dwt", "생산능력", "가동률"], 2, rows, exclude=t4))
     t5c = pick_tables(rnd, ["선박건조", "장기운송", "주요계약", "공급계약"], 1, rows, rowclip=330)
     fleet_note = []
-    if not any(re.search(r"\|\s*(선종|선박명|보유\s*척수)", t) for t in t5 + t4):
+    is_ship = sum(l.count("선박") for l in (biz["all"] if biz else [])) > 15
+    if is_ship and not any(re.search(r"\|\s*(선종|선박명|보유\s*척수)", t) for t in t5 + t4):
         fleet_note = [f"- 선종별 척수·보유/용선 구분 표: {NF} (이 보고서의 사업의 내용 기준)"]
     s5 = section("5. 생산·설비·계약·R&D",
                  t5 + fleet_note + t5c
                  + keyword_lines(rnd, ["연구개발비용", "연구개발", "R&D"], max(1, nlines - 4)))
 
+    s5b = section("5-2. 경쟁·시장 (원문 발췌, 기업 서술)",
+                  keyword_lines(B.get("etc", []) or allb,
+                                ["경쟁", "점유율", "진입장벽", "과점", "독점", "대체"], max(2, nlines - 2)))
+
     s6 = section("6. 전년 대비 바뀐 문구", ["not_implemented (STEP 2에서 구현)"])
     s7 = f"## 7. 고정 질문 (BM 판별 체크리스트)\n{QUESTIONS}\n"
 
-    return "\n".join([head, fin_block(fin), s1, s2, s3, s4, s5, s6, s7])
+    return "\n".join([head, fin_block(fin), s1, s2, s3, s4, s5, s5b, s6, s7])
 
 
 def make_card(meta, fin, biz):
