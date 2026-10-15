@@ -146,7 +146,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
 
   // ------- 차트(SVG): 한 차트에 한 계열, 값 라벨은 막대 위, 전년 동기 대비는 라벨 아래
   var W = 480, H = 230, L = 44, R = 8, T = 22, B = 40;
-  function fmtN(v, u) { return u === "%" ? v.toFixed(1) + "%" : (u === "원" || u === "주") ? Math.round(v).toLocaleString("ko-KR") : Math.round(v / 1e8).toLocaleString("ko-KR"); }
+  function fmtN(v, u) { return u === "%" ? v.toFixed(1) + "%" : (u === "원" || u === "주" || u === "백만") ? Math.round(v).toLocaleString("ko-KR") : Math.round(v / 1e8).toLocaleString("ko-KR"); }
   function frame(vals, u, zero) {
     var mx = Math.max.apply(null, vals), mn = zero ? Math.min(0, Math.min.apply(null, vals)) : Math.min.apply(null, vals);
     if (u === "%") { mx = Math.max(mx, 0); mn = Math.min(mn, 0); }
@@ -158,7 +158,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     var s = "";
     for (var i = 0; i <= 3; i++) {
       var gv = f.mn + (f.mx - f.mn) * i / 3, gy = T + f.ph - (gv - f.mn) / (f.mx - f.mn) * f.ph;
-      s += "<line class='ax' x1='" + L + "' x2='" + (W - R) + "' y1='" + gy + "' y2='" + gy + "'/><text x='" + (L - 5) + "' y='" + (gy + 3.5) + "' text-anchor='end'>" + (u === "%" ? gv.toFixed(0) + "%" : u === "주" ? (Math.abs(gv) >= 1e3 ? (gv / 1e4).toFixed(1) + "만" : Math.round(gv).toLocaleString("ko-KR")) : u === "원" ? Math.round(gv).toLocaleString("ko-KR") : Math.round(gv / 1e8).toLocaleString("ko-KR")) + "</text>";
+      s += "<line class='ax' x1='" + L + "' x2='" + (W - R) + "' y1='" + gy + "' y2='" + gy + "'/><text x='" + (L - 5) + "' y='" + (gy + 3.5) + "' text-anchor='end'>" + (u === "%" ? gv.toFixed(0) + "%" : u === "주" ? (Math.abs(gv) >= 1e3 ? (gv / 1e4).toFixed(1) + "만" : Math.round(gv).toLocaleString("ko-KR")) : (u === "원" || u === "백만") ? Math.round(gv).toLocaleString("ko-KR") : Math.round(gv / 1e8).toLocaleString("ko-KR")) + "</text>";
     }
     return s;
   }
@@ -177,13 +177,18 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       if ((n - 1 - k) % (n > 10 ? 2 : 1) === 0) s += "<text x='" + cx + "' y='" + (H - 22) + "' text-anchor='middle'>" + esc(lb) + "</text>";
       if (v == null) return;
       var y1 = y(v), top = Math.min(y0, y1), h = Math.max(1.5, Math.abs(y0 - y1));
-      s += "<rect class='" + (v < 0 ? "bn" : "b2") + (k === n - 1 ? "" : " dim") + "' x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2'><title>" + esc(lb + " " + fmtN(v, u) + (u === "%" ? "" : (u === "원" || u === "주") ? u : "억")) + "</title></rect>";
+      s += "<rect class='" + (v < 0 ? "bn" : "b2") + (k === n - 1 ? "" : " dim") + "' x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2'><title>" + esc(lb + " " + fmtN(v, u) + (u === "%" ? "" : (u === "원" || u === "주") ? u : u === "백만" ? "" : "억")) + "</title></rect>";
       if (v !== 0) s += "<text class='vt' x='" + cx + "' y='" + (v >= 0 ? top - 4 : top + h + 11) + "' text-anchor='middle'>" + fmtN(v, u) + "</text>";
       var bv = k >= 4 ? vals[k - 4] : (pre && pre[k] != null ? pre[k] : null);
-      if (yoyBase && bv != null && bv > 0) {
-        var g = (v - bv) / bv * 100;
-        if (n <= 13) s += "<text class='" + (g >= 0 ? "gp" : "gn") + " sm' x='" + cx + "' y='" + (v >= 0 ? top - 16 : y0 - 6) + "' text-anchor='middle'>" + (Math.abs(g) > 999 ? "–" : (g > 0 ? "+" : "") + Math.round(g) + "%") + "</text>";
-        if (n > 13) s += "<text class='" + (g >= 0 ? "gp" : "gn") + (n >= 12 ? " sm" : "") + "' x='" + cx + "' y='" + (H - 8) + "' text-anchor='middle'>" + (Math.abs(g) > 999 ? "–" : (g > 0 ? "+" : "") + Math.round(g) + (n >= 12 && k !== n - 1 ? "" : "%")) + "</text>";
+      if (yoyBase && bv != null && bv !== 0) {
+        var yt, yc;
+        if (bv > 0) {
+          var g = (v - bv) / bv * 100; yc = g >= 0 ? "gp" : "gn";
+          yt = Math.abs(g) > 999 ? (v > 0 ? "×" + Math.round(v / bv) : "적전") : (g > 0 ? "+" : "") + Math.round(g) + "%";
+          if (v < 0) yt = "적전";
+        } else { yc = v > 0 ? "gp" : "gn"; yt = v > 0 ? "흑전" : "적자↓"; }
+        if (n <= 13) s += "<text class='" + yc + " sm' x='" + cx + "' y='" + (v >= 0 ? top - 16 : y0 - 6) + "' text-anchor='middle'>" + yt + "</text>";
+        else if ((n - 1 - k) % 2 === 0) s += "<text class='" + yc + (n >= 12 ? " sm" : "") + "' x='" + cx + "' y='" + (H - 8) + "' text-anchor='middle'>" + (n >= 12 && k !== n - 1 && /%$/.test(yt) ? yt.slice(0, -1) : yt) + "</text>";
       }
     });
     return chartBox(title, sub, s, title + " 분기 추이");
@@ -476,8 +481,14 @@ h2.vd b { color: var(--accent); font-weight: 600; }
         "<div class='charts' style='grid-template-columns:minmax(0,640px)'>" + barOne("월별 순증감", "거래월 기준 · 주 · 장내·시간외 매매만", is.labels, is.v, "주", false, []) + "</div><h3>최근 거래 내역</h3>" + itb + "<div class='meta'>임원·주요주주 소유상황 보고서(DART)의 세부변동내역입니다. 금액은 단가 × 증감 주식 수로 계산했습니다.</div>");
     }
     // 7 수주
-    var ob = ordersBlock(s.orders);
-    if (ob) h += "<section class='card sec' id='orders'><div class='q'>일감은 얼마나 쌓여 있나</div><h2 class='vd'>수주 현황 (공시 원문 표)</h2>" + ob + "</section>";
+    var ob = ordersBlock(s.orders), od = s.ord;
+    if (od && od.backlog.some(ok)) {
+      var ol = od.backlog.length - 1, bl = od.backlog, bq = ol > 0 ? bl[ol - 1] : null, by_ = ol >= 4 ? bl[ol - 4] : null;
+      var gq = function (a, b) { return (a != null && b > 0) ? ((a - b) / b * 100) : null; }, gy2 = gq(bl[ol], by_), gq2 = gq(bl[ol], bq);
+      var nl = od.new.length - 1, nlast = od.new[nl];
+      h += sec(s, "orders", "일감은 얼마나 쌓여 있나", "수주잔고 **" + Math.round(bl[ol]).toLocaleString("ko-KR") + " " + esc(od.unit) + "**" + (gq2 != null ? ", 전분기 대비 " + (gq2 > 0 ? "+" : "") + gq2.toFixed(0) + "%" : "") + (gy2 != null ? ", 전년 동기 대비 " + (gy2 > 0 ? "+" : "") + gy2.toFixed(0) + "%" : "") + (nlast != null ? ". 이번 분기 신규수주(추정) " + Math.round(nlast).toLocaleString("ko-KR") + " " + esc(od.unit) : "") + ".",
+        "<div class='charts'>" + barOne("수주잔고", "분기말 · " + od.unit + " · 아래 %는 전년 동기 대비", od.labels, bl, "백만", true, []) + barOne("신규수주 (추정)", "분기 · " + od.unit + " · 납품 + 잔고 증감", od.labels, od.new, "백만", true, []) + "</div><div class='meta'>각 정기보고서(분기·반기·사업)의 '수주상황' 합계 표에서 읽었습니다. 신규수주는 공시값이 아니라 분기 납품액(기납품액의 누적 차이)에 잔고 증감을 더한 추정치이고, 집계 기간이 맞지 않는 분기는 비워 두었습니다. 단위는 회사가 공시한 통화 기준입니다.</div>" + (ob ? "<details><summary>최신 수주 표 (원문)</summary>" + ob + "</details>" : ""));
+    } else if (ob) h += "<section class='card sec' id='orders'><div class='q'>일감은 얼마나 쌓여 있나</div><h2 class='vd'>수주 현황 (공시 원문 표)</h2>" + ob + "</section>";
     // 8 변화·공시
     h += det("최근 주요 공시 (증자·사채·계약·자기주식 등)", md(s.secs.s62), true);
     h += det("바뀐 문구 (인접 보고서)", md(s.secs.s6), false);

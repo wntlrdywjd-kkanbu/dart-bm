@@ -446,6 +446,76 @@ def collect_segments(reps, maxn=20):
     return list(reversed(out))  # 과거 → 최신
 
 
+# ---------------------------------------------------------------- 수주잔고 시계열 (모든 정기보고서의 '수주상황' 표)
+_NUMTOK = re.compile(r"^-?[\d,]+(\.\d+)?$")
+
+
+def _cellnums(row):
+    """표 행의 숫자 셀만 (순서 유지). '-' 는 빈 값으로 보고 제외하지 않고 None 으로 둔다."""
+    out = []
+    for c in [x.strip() for x in row.strip().strip("|").split("|")][1:]:
+        c2 = c.replace(" ", "")
+        if _NUMTOK.match(c2):
+            out.append(_num(c2))
+        elif c2 in ("-", "", "–"):
+            out.append(None)
+    return out
+
+
+def order_series(biz):
+    """수주상황 표 1개에서 합계(수주총액·기납품액·수주잔고)와 품목별 잔고를 읽는다. 실패하면 None."""
+    if not biz:
+        return None
+    prev = None
+    for b in split_blocks(biz["all"]):
+        pb, prev = prev, b
+        if b["type"] != "table" or len(b["rows"]) < 3:
+            continue
+        head = " ".join(b["rows"][:2])
+        if not ("수주잔고" in head.replace(" ", "") and ("수주총액" in head.replace(" ", "") or "기납품" in head.replace(" ", ""))):
+            continue
+        unit = ""
+        if pb and pb["type"] == "table" and len(pb["rows"]) == 1 and "단위" in pb["rows"][0]:
+            unit = re.sub(r"[|\s]+", " ", pb["rows"][0]).strip()
+        elif b.get("caption") and "단위" in b["caption"]:
+            unit = b["caption"]
+        m = re.search(r"단위\s*[:：]?\s*([^)\s]*[^)]*)", unit)
+        unit = (m.group(1).strip() if m else unit).strip(" )")
+        tot = None
+        items = {}
+        for r in b["rows"][2:]:
+            name = re.sub(r"\s+", "", r.strip().strip("|").split("|")[0])
+            nums = _cellnums(r)
+            vals = [v for v in nums if v is not None]
+            if len(nums) >= 6 and len(vals) >= 3:
+                amt = [nums[1], nums[3], nums[5]]
+            elif len(nums) >= 3:
+                amt = nums[-3:]
+            else:
+                continue
+            if name in ("합계", "계", "총계", "소계"):
+                tot = amt
+            elif name:
+                items[name] = amt[2]
+        if tot and tot[2] is not None:
+            return {"unit": unit, "total": tot[0], "deliv": tot[1], "backlog": tot[2], "items": items}
+    return None
+
+
+def collect_orders(reps, maxn=20):
+    out = []
+    for r in reps[:maxn]:
+        try:
+            b = get_biz(r["rcept_no"])
+        except RuntimeError:
+            continue
+        o = order_series(b)
+        if o:
+            o.update({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"]})
+            out.append(o)
+    return list(reversed(out))
+
+
 # ---------------------------------------------------------------- 내부자 거래 (DART elestock) · 공급계약 (거래소공시)
 def collect_insider(corp_code, d):
     """임원·주요주주 특정증권 소유상황 보고 목록(증감 주식 수). 가격·보고사유는 원문에만 있어 최근 3건 원문을 insider_docs/ 에 저장(양식 확인용)."""
@@ -1143,6 +1213,11 @@ def main():
 
     d = os.path.join(a.out, corp["stock_code"])
     os.makedirs(d, exist_ok=True)
+    try:
+        fin["orders_hist"] = collect_orders(reps)
+        print(f"수주잔고 {len(fin['orders_hist'])}개 보고서")
+    except Exception as e:
+        print(f"[경고] 수주잔고 수집 실패: {e}", file=sys.stderr)
     try:
         fin["segments"] = collect_segments(reps)
         print(f"부문 비중 {len(fin['segments'])}개 보고서")

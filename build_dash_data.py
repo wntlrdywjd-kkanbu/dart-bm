@@ -141,6 +141,42 @@ def extra(base, meta, fin):
             qv[qk(r)] += -r["amt"] if r["kind"] == "해지" else r["amt"]
         ex["ctr"] = {"rows": [[r["dt"], r["kind"], r.get("party", ""), r["amt"], r.get("pct"), r.get("start", ""), r.get("end", "")] for r in ctr[:30]],
                      "labels": qs_, "v": [qv[k] for k in qs_]}
+    oh = fin.get("orders_hist") or []
+    if len(oh) >= 3:
+        units = [o["unit"] for o in oh if o.get("unit")]
+        un = max(set(units), key=units.count) if units else ""
+        mm = re.search(r"([\d,]+)", un)
+        us = "US" in un
+        mult = float(mm.group(1).replace(",", "")) if mm else (1e8 if "억" in un else 1e6 if "백만" in un else 1e3 if "천" in un else 1.0)
+        div = 1e6 if us else 1e8
+        uname = "US$ 백만" if us else "억원"
+        qkeys = sorted({f"{o['key'][:4]}.{int(o['key'][5:]):02d}" for o in oh})
+        by = {o["key"]: o for o in oh}
+        ys = int(qkeys[0][:4])
+        ye = int(qkeys[-1][:4])
+        labels, bl, dl, nw = [], [], [], []
+        prevb = None
+        for y in range(ys, ye + 1):
+            for m in (3, 6, 9, 12):
+                k = f"{y}.{m:02d}"
+                if k < qkeys[0] or k > qkeys[-1]:
+                    continue
+                o = by.get(k)
+                labels.append(f"{str(y)[2:]}.{m}")
+                b = o["backlog"] * mult / div if o else None
+                q = None
+                if o and o.get("deliv") is not None:
+                    pk_ = by.get(f"{y}.{m-3:02d}") if m > 3 else None
+                    q = (o["deliv"] - (pk_["deliv"] if pk_ else 0)) * mult / div if (m == 3 or pk_) else None
+                if q is not None and q < 0:
+                    q = None  # 집계 기간이 달라 누적이 역전된 보고서
+                n_ = (q + b - prevb) if (q is not None and b is not None and prevb is not None) else None
+                if n_ is not None and n_ < 0:
+                    n_ = None
+                bl.append(b); dl.append(q); nw.append(n_)
+                prevb = b
+        ex["ord"] = {"unit": uname, "labels": labels, "backlog": bl, "deliv": dl, "new": nw,
+                     "items": {k: v for k, v in (oh[-1].get("items") or {}).items() if v}, "latest": oh[-1]["key"]}
     try:
         p = json.load(open(os.path.join(base, "price.json"), encoding="utf-8"))
     except OSError:
