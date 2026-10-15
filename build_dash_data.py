@@ -20,6 +20,95 @@ def series(q, key):
     return [x["values"].get(key) for x in q]
 
 
+def nseg(n):
+    """부문명 정규화: '&cr'·공백 제거, 부분→부문"""
+    return re.sub(r"\s+", "", (n or "").replace("&cr", "")).replace("부분", "부문")
+
+
+def ttm(vals, i):
+    w = vals[i - 3:i + 1] if i >= 3 else []
+    return sum(w) if len(w) == 4 and all(v is not None for v in w) else None
+
+
+def cfrow(rows, pat):
+    for nm, v in rows or []:
+        if re.search(pat, re.sub(r"\s+", "", nm or "")) and v is not None:
+            return v
+    return None
+
+
+def cfw(items):
+    """현금흐름 브리지·순이익→영업현금 워터폴(원 단위). 부호는 보고서 값 그대로, 이자·세금·기타는 잔차."""
+    rows = items.get("_cf") or []
+    g = lambda k: (items.get(k) or {}).get("당기")
+    ni = cfrow(rows, r"^(연결)?당기순(이익|손익|손실)(\(손실\))?$")
+    adj = cfrow(rows, r"조정을위한가감|^조정$|^조정항목")
+    wc = cfrow(rows, r"자산부채의변동|자산및부채의변동")
+    ocf, icf, fcf = g("영업활동현금흐름"), g("투자활동현금흐름"), g("재무활동현금흐름")
+    out = {"기초현금": g("기초현금"), "기말현금": g("기말현금"), "영업": ocf, "투자": icf, "재무": fcf,
+           "환율": cfrow(rows, r"^현금및현금성자산에대한환율변동효과")}
+    if None not in (ni, adj, wc, ocf):
+        out["워터폴"] = {"순이익": ni, "조정": adj, "운전자본": wc, "이자·세금·기타": ocf - ni - adj - wc, "영업현금": ocf}
+    return out
+
+
+def extra(base, meta, fin):
+    """1단계 확장: 20분기 시계열, BS 시계열, 현금흐름, 배당, 부문 비중, 시세·밸류에이션"""
+    ex = {}
+    qs = list(reversed(fin.get("quarters") or []))
+    keys = ["매출액", "영업이익", "당기순이익", "매출원가", "판관비", "매출총이익", "영업활동현금흐름", "투자활동현금흐름", "재무활동현금흐름"]
+    q20 = {"labels": [x["label"] for x in qs], "keys": [x["key"] for x in qs], "check": [x["label"] for x in qs if x.get("check")]}
+    for k in keys:
+        q20[k] = series(qs, k)
+    for k in ("매출액", "영업이익", "당기순이익", "매출총이익"):
+        q20[k + "_ttm"] = [ttm(q20[k], i) for i in range(len(qs))]
+    ex["q20"] = q20
+    pr = fin.get("periods_raw") or {}
+    pk = sorted(pr)[-12:]
+    bs = {"labels": [f"{k[2:4]}.{k[5:]}" for k in pk], "keys": pk}
+    for k in ["자산총계", "부채총계", "자본총계", "유동자산", "비유동자산", "유동부채", "비유동부채", "이익잉여금", "자본금", "현금및현금성자산", "재고자산", "매출채권"]:
+        bs[k] = [((pr[p].get(k) or {}).get("당기")) for p in pk]
+    ex["bs"] = bs
+    akeys = [k for k in sorted(pr) if k.endswith(".12")]
+    cfd = {}
+    if akeys:
+        cfd["연간"] = {"label": "FY" + akeys[-1][:4], **cfw(pr[akeys[-1]])}
+    lk = max(pr) if pr else None
+    if lk and lk not in akeys:
+        cfd["최신"] = {"label": lk[2:4] + "." + lk[5:] + " 누적", **cfw(pr[lk])}
+    ex["cf"] = cfd
+    if fin.get("dividend"):
+        ex["div"] = fin["dividend"]
+    segs = fin.get("segments") or []
+    if segs:
+        names = {}
+        for s_ in segs:
+            for n, v in s_["items"].items():
+                names[nseg(n)] = n
+        latest = {nseg(n): v for n, v in segs[-1]["items"].items()}
+        order = sorted(names, key=lambda n: -(latest.get(n) or 0))
+        ex["seg"] = {"keys": [s_["key"] for s_ in segs], "kinds": [s_["kind"] for s_ in segs],
+                     "names": [re.sub(r"\s+", " ", names[n].replace("&cr", "")).strip() for n in order],
+                     "values": [[{nseg(n): v for n, v in s_["items"].items()}.get(n) for s_ in segs] for n in order]}
+    try:
+        p = json.load(open(os.path.join(base, "price.json"), encoding="utf-8"))
+    except OSError:
+        p = None
+    if p:
+        pv = {"date": p["date"], "close": p["close"], "change_pct": p["change_pct"], "mcap": p["mcap"], "shares": p["shares"],
+              "market": p["market"], "history": p["history"]}
+        i = len(qs) - 1
+        ni, rv = ttm(q20["당기순이익"], i), ttm(q20["매출액"], i)
+        eq = bs["자본총계"][-1] if bs["자본총계"] else None
+        dps = (fin.get("dividend") or {}).get("dps") or []
+        pv["val"] = {"PER": p["mcap"] / ni if ni and ni > 0 else None, "PBR": p["mcap"] / eq if eq and eq > 0 else None,
+                     "PSR": p["mcap"] / rv if rv else None,
+                     "배당수익률": (dps[-1] / p["close"] * 100) if dps and dps[-1] and p["close"] else None,
+                     "기준": "TTM(최근 4분기) 연결 당기순이익·매출, 최근 보고서 자본총계"}
+        ex["price"] = pv
+    return ex
+
+
 def build(code):
     base = os.path.join(OUT, code)
     d = json.load(open(os.path.join(base, "fin.json"), encoding="utf-8"))
@@ -60,6 +149,7 @@ def build(code):
         doc["notes"] = json.load(open(os.path.join(base, "notes.json"), encoding="utf-8"))
     except OSError:
         pass
+    doc.update(extra(base, meta, fin))
     s = json.dumps(doc, ensure_ascii=False)
     assert len(s.encode("utf-8")) < 240_000, f"{code}: {len(s)} bytes"
     json.dump(doc, open(os.path.join(base, "dash.json"), "w", encoding="utf-8"), ensure_ascii=False)
