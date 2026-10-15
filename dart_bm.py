@@ -516,6 +516,108 @@ def collect_orders(reps, maxn=20):
     return list(reversed(out))
 
 
+# ---------------------------------------------------------------- 생산능력·가동률 시계열 (모든 정기보고서의 '생산실적 및 가동률' 표)
+CAPA_LABELS = (("생산능력", "capa"), ("CAPA", "capa"), ("생산실적", "prod"), ("생산량", "prod"), ("가동률", "util"), ("가동율", "util"), ("기말재고", "inv"))
+
+
+def _lab(c):
+    c2 = re.sub(r"\s+", "", c)
+    for k, v in CAPA_LABELS:
+        if c2.upper().startswith(k.upper()):
+            return v
+    return None
+
+
+def capa_from_lines(lines):
+    """보고서 1건에서 부문별 (생산능력·생산실적·가동률·기말재고)의 '당기(첫 숫자 열)' 값을 읽는다. 없으면 None.
+    표 형태: '| 부문 | 생산능력 | 당기 | 전기 | 전전기 |' 뒤에 '| 생산실적 | ... |' 가 이어지는 구조(부문 셀은 rowspan 이라 생략되기도 함)."""
+    groups, cur, unit = {}, None, ""
+    blocks = split_blocks(lines)
+    for b in blocks:
+        if b["type"] != "table":
+            continue
+        head = (b.get("caption") or "") + " " + " ".join(b["rows"][:1])
+        if not any(k in " ".join(b["rows"]).replace(" ", "") for k in ("가동률", "가동율")):
+            continue
+        mu = re.search(r"단위\s*[:：]?\s*([^)]+)\)", head)
+        unit = mu.group(1).strip() if mu else unit
+        for r in b["rows"][1:]:
+            cells = [x.strip() for x in r.strip().strip("|").split("|")]
+            lab = _lab(cells[0]) if cells else None
+            if lab and len(cells) >= 2:
+                name, vals = cur, cells[1:]
+            elif len(cells) >= 3 and _lab(cells[1]):
+                lab, cur, name, vals = _lab(cells[1]), cells[0], cells[0], cells[2:]
+            else:
+                continue
+            if not name:
+                continue
+            v = None
+            for c in vals:
+                c2 = c.replace(",", "").replace("%", "").strip()
+                if re.fullmatch(r"-?\d+(\.\d+)?", c2):
+                    v = float(c2)
+                    break
+            if v is not None:
+                groups.setdefault(re.sub(r"\s+", "", name), {"unit": unit})[lab] = v
+    groups = {k: v for k, v in groups.items() if "util" in v and ("prod" in v or "capa" in v)}
+    return groups or None
+
+
+def collect_capa(reps, maxn=20):
+    out = []
+    for r in reps[:maxn]:
+        try:
+            b = get_biz(r["rcept_no"])
+        except RuntimeError:
+            continue
+        g = capa_from_lines(b["all"]) if b else None
+        if g:
+            out.append({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"], "groups": g})
+    return list(reversed(out))
+
+
+# ---------------------------------------------------------------- 비용의 성격별 분류 (재무제표 주석) 원문 수집
+COST_KEYS = ("성격별", "비용의 성격")
+
+
+def collect_cost_raw(reps, maxn=20):
+    """각 보고서 전체 문서에서 '비용의 성격별 분류' 주석 표를 원문 그대로 저장(cache/cost/{rcept}.json). 불변 캐시."""
+    cd = os.path.join(CACHE, "cost")
+    os.makedirs(cd, exist_ok=True)
+    n = 0
+    for r in reps[:maxn]:
+        fp = os.path.join(cd, f"{r['rcept_no']}.json")
+        if os.path.exists(fp):
+            n += 1
+            continue
+        try:
+            lines = to_text(fetch_doc(r["rcept_no"]))
+        except Exception as e:
+            print(f"[경고] 비용 주석 {r['rcept_no']} 실패: {e}", file=sys.stderr)
+            continue
+        out, ctx = [], []
+        i = 0
+        while i < len(lines):
+            l = lines[i]
+            if l.startswith("|"):
+                j = i
+                while j < len(lines) and lines[j].startswith("|"):
+                    j += 1
+                near = " ".join(ctx[-8:])
+                body = " ".join(lines[i:j])
+                if (any(k in near for k in COST_KEYS) or ("성격" in body[:200])) and j - i >= 4:
+                    out.append({"ctx": ctx[-4:], "rows": lines[i:j][:80]})
+                i = j
+                continue
+            if l.strip():
+                ctx.append(l.strip()[:160])
+            i += 1
+        json.dump({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"], "tables": out[:6]}, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
+        n += 1
+    return n
+
+
 # ---------------------------------------------------------------- 내부자 거래 (DART elestock) · 공급계약 (거래소공시)
 def collect_insider(corp_code, d):
     """임원·주요주주 특정증권 소유상황 보고 목록(증감 주식 수). 가격·보고사유는 원문에만 있어 최근 3건 원문을 insider_docs/ 에 저장(양식 확인용)."""
@@ -1213,6 +1315,15 @@ def main():
 
     d = os.path.join(a.out, corp["stock_code"])
     os.makedirs(d, exist_ok=True)
+    try:
+        fin["capa_hist"] = collect_capa(reps)
+        print(f"가동률 {len(fin['capa_hist'])}개 보고서")
+    except Exception as e:
+        print(f"[경고] 가동률 수집 실패: {e}", file=sys.stderr)
+    try:
+        print(f"비용 주석 원문 {collect_cost_raw(reps)}개 보고서")
+    except Exception as e:
+        print(f"[경고] 비용 주석 수집 실패: {e}", file=sys.stderr)
     try:
         fin["orders_hist"] = collect_orders(reps)
         print(f"수주잔고 {len(fin['orders_hist'])}개 보고서")
