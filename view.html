@@ -416,6 +416,15 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       if (i1.length) h += sec(s, "seg", "무엇을 얼마나 파는가", "**" + esc(i1[0].n) + "** 비중 " + i1[0].v.toFixed(1) + "%.", "<div class='charts'>" + hbars("매출 비중", s.latest, i1) + "</div>");
     }
 
+    var rg = s.region;
+    if (rg && rg.labels.length >= 4) {
+      var rn = rg.labels.length - 1, tt = function (a, j) { return a.slice(j - 3, j + 1).reduce(function (x, y) { return x + y; }, 0); };
+      var expSh = rg.labels.map(function (_, j) { var t = rg.dom[j] + rg.exp[j]; return t > 0 ? rg.exp[j] / t * 100 : null; });
+      var tD = rn >= 3 ? tt(rg.dom, rn) : null, tE = rn >= 3 ? tt(rg.exp, rn) : null, shT = tD != null ? tE / (tD + tE) * 100 : null;
+      var tD1 = rn >= 7 ? tt(rg.dom, rn - 4) : null, tE1 = rn >= 7 ? tt(rg.exp, rn - 4) : null, shT1 = tD1 != null ? tE1 / (tD1 + tE1) * 100 : null;
+      h += sec(s, "region", "어디에 파는가 (내수·수출)", "최근 4분기 수출 비중 **" + pct(shT) + "**" + (shT1 != null ? "(1년 전 " + pct(shT1) + ")" : "") + ", 수출 " + Math.round(tE).toLocaleString("ko-KR") + "억 · 내수 " + Math.round(tD).toLocaleString("ko-KR") + "억.",
+        "<div class='charts'>" + stackedPct("내수·수출 비중", "분기 · 매출 실적 표 기준", rg.labels.map(function (l) { return "20" + l; }), ["내수", "수출"], [rg.dom, rg.exp]) + barOne("수출 매출", "분기 · 억원 · 아래 %는 전년 동기 대비", rg.labels, rg.exp, "백만", true, []) + "</div><div class='meta'>각 정기보고서의 '매출 실적' 표(내수·수출 총계)에서 읽었고, 누적값의 차이로 분기를 계산했습니다. 국가별·지역별 상세는 종목마다 양식이 달라 원문 표를 따로 확인합니다.</div>");
+    }
     // 2 매출·이익
     var tR = q.매출액_ttm, tO = q.영업이익_ttm, tN = q.당기순이익_ttm, g = function (a) { return ok(a[i]) && ok(a[i - 4]) ? yoy(a[i], a[i - 4]) : null; };
     var opmT = div(tO[i], tR[i]), opmP = i >= 4 ? div(tO[i - 4], tR[i - 4]) : null;
