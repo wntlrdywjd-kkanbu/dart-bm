@@ -131,9 +131,9 @@ PERIODIC_RE = re.compile(r"(사업|반기|분기)보고서\s*\((\d{4})\.(\d{2})\
 
 
 def list_periodic(corp_code):
-    """최근 3년 정기보고서(사업/반기/분기)를 기간별 1건(정정본 포함 최신 접수)으로 정리. 최신 기간 순."""
+    """최근 5년 정기보고서(사업/반기/분기)를 기간별 1건(정정본 포함 최신 접수)으로 정리. 최신 기간 순."""
     today = datetime.date.today()
-    bgn = today - datetime.timedelta(days=365 * 3)
+    bgn = today - datetime.timedelta(days=365 * 5 + 30)
     rows, page, total = [], 1, 1
     while page <= total and page <= 10:
         j = get_json("list.json", corp_code=corp_code,
@@ -208,7 +208,20 @@ EXTRA_ITEMS = [
     ("유동자산", ("BS",), ["유동자산"]),
     ("유동부채", ("BS",), ["유동부채"]),
     ("매출총이익", ("IS", "CIS"), ["매출총이익", "매출총이익(손실)"]),
+    ("매출원가", ("IS", "CIS"), ["매출원가"]),
+    ("판관비", ("IS", "CIS"), ["판매비와관리비", "판매비와일반관리비", "판매관리비", "판매비및관리비"]),
+    ("비유동자산", ("BS",), ["비유동자산"]),
+    ("비유동부채", ("BS",), ["비유동부채"]),
+    ("이익잉여금", ("BS",), ["이익잉여금", "이익잉여금(결손금)", "이익잉여금(deficit)", "결손금", "미처분이익잉여금", "re:^이익잉여금"]),
+    ("자본금", ("BS",), ["자본금"]),
+    ("기초현금", ("CF",), ["기초현금및현금성자산", "기초의현금및현금성자산", "기초현금", "re:^기초.*현금"]),
+    ("기말현금", ("CF",), ["기말현금및현금성자산", "기말의현금및현금성자산", "기말현금", "re:^기말.*현금"]),
+    ("CF조정", ("CF",), ["조정", "조정항목", "손익조정", "re:^조정$|^조정항목"]),
+    ("CF운전자본", ("CF",), ["re:자산부채의변동|자산및부채의변동|영업활동으로인한자산|영업활동자산부채"]),
+    ("CF영업창출", ("CF",), ["re:영업(에서|으로부터)창출된(현금|현금흐름)|영업에서창출"]),
 ]
+# 분기 단독값을 계산할 항목(누적 보고 → 차분). CF는 보고서가 누적값을 주므로 같은 방식으로 처리
+QFLOWS = FLOWS + ["매출원가", "판관비", "매출총이익", "영업활동현금흐름", "투자활동현금흐름", "재무활동현금흐름"]
 
 
 def pick_fin(rows):
@@ -218,7 +231,9 @@ def pick_fin(rows):
         found = None
         for cand in cands:
             for r in rows:
-                if r.get("sj_div") in divs and norm(r.get("account_nm")) == norm(cand):
+                nm0 = norm(r.get("account_nm"))
+                hit = bool(re.search(cand[3:], nm0)) if cand.startswith("re:") else nm0 == norm(cand)
+                if r.get("sj_div") in divs and hit:
                     found = {"당기": to_int(r.get("thstrm_amount")),
                              "전기": to_int(r.get("frmtrm_amount")),
                              "당기누적": to_int(r.get("thstrm_add_amount")),
@@ -259,7 +274,7 @@ def cum(it):
     return it["당기누적"] if it.get("당기누적") is not None else it["당기"]
 
 
-def build_quarters(periods, latest_key, fy_end=12, n=8):
+def build_quarters(periods, latest_key, fy_end=12, n=20):
     """periods: {(연,월): {항목: pick_fin 결과}} -> 최근 n개 분기 단독 값(원 단위). 최신 분기부터."""
     out, key = [], latest_key
     for _ in range(n):
@@ -268,7 +283,7 @@ def build_quarters(periods, latest_key, fy_end=12, n=8):
         cur = periods.get(key)
         prev = periods.get(prev_period(y, m)) if q > 1 else None
         vals, how, check = {}, "-", ""
-        for label in FLOWS:
+        for label in QFLOWS:
             c = cur.get(label) if cur else None
             v = None
             if c is not None:
@@ -314,7 +329,7 @@ def collect_fin(corp_code, reps):
     need = [ak]
     if fy_end == 12:
         key = lk
-        for _ in range(8):
+        for _ in range(20):
             need.append(key)
             if qnum(key[1], fy_end) > 1:
                 need.append(prev_period(*key))
@@ -342,6 +357,95 @@ def collect_fin(corp_code, reps):
         fin["note"] = f"연결/별도 혼재: {basis_by_key}"
     fin["periods_raw"] = {f"{k[0]}.{k[1]:02d}": v for k, v in periods.items()}
     return fin
+
+
+# ---------------------------------------------------------------- 배당 (DART alotMatter)
+def _num(x):
+    try:
+        return float(str(x).replace(",", "").strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def collect_dividend(corp_code, annual_year):
+    """사업보고서 기준 최근 6개 사업연도 DPS·배당성향·배당수익률. 한 번 호출에 3개년(당기/전기/전전기)."""
+    res = {}
+    for by in (annual_year, annual_year - 3):
+        try:
+            j = get_json("alotMatter.json", corp_code=corp_code, bsns_year=str(by), reprt_code="11011")
+        except RuntimeError:
+            continue
+        for r in j.get("list") or []:
+            se, knd = norm(r.get("se")), norm(r.get("stock_knd"))
+            if "주당현금배당금" in se and knd in ("보통주", ""):
+                key = "dps"
+            elif "현금배당성향" in se:
+                key = "payout"
+            elif "현금배당수익률" in se and knd in ("보통주", ""):
+                key = "yield"
+            else:
+                continue
+            for off, f in ((0, "thstrm"), (1, "frmtrm"), (2, "lwfr")):
+                v = _num(r.get(f))
+                if v is not None:
+                    res.setdefault(key, {}).setdefault(by - off, v)
+    ys = sorted({y for d in res.values() for y in d})
+    return {"years": ys, **{k: [res.get(k, {}).get(y) for y in ys] for k in ("dps", "payout", "yield")}} if ys else {}
+
+
+# ---------------------------------------------------------------- 보고서별 부문 매출 비중
+UNIT_MULT = {"백만원": 1e6, "천원": 1e3, "억원": 1e8, "원": 1.0}
+
+
+def _unit(caption):
+    m = re.search(r"단위\s*:\s*([가-힣]+)", caption or "")
+    return UNIT_MULT.get(m.group(1)) if m else None
+
+
+def seg_from_lines(lines):
+    """'주요 제품 등의 현황' 표(매출액·비율 열)에서 사업부문별 매출을 원 단위로 추출. 합계 검증 실패 시 None."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or "매출액" not in ln or "비율" not in ln:
+            continue
+        hdr = [c.strip() for c in ln.strip().strip("|").split("|")]
+        if len(hdr) < 3 or hdr[-1] != "비율":
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if lines[k].strip() and not lines[k].startswith("|")), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, name, k = {}, None, None, i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            if len(c) < 2:
+                continue
+            amt = _num(c[-2])
+            if c[0].replace(" ", "") in ("합계", "계", "총계"):
+                total = amt
+                continue
+            if len(c) == len(hdr) and c[0]:
+                name = c[0]
+            if amt is None or name is None:
+                continue
+            items[name] = items.get(name, 0) + amt
+        if items and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k2: v * mult for k2, v in items.items()}
+        return None
+    return None
+
+
+def collect_segments(reps, maxn=20):
+    out = []
+    for r in reps[:maxn]:
+        try:
+            b = get_biz(r["rcept_no"])
+        except RuntimeError:
+            continue
+        seg = seg_from_lines(b["all"]) if b else None
+        if seg:
+            out.append({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"], "items": seg})
+    return list(reversed(out))  # 과거 → 최신
 
 
 def eok(v):
@@ -864,6 +968,10 @@ def main():
             "generated_at": datetime.datetime.now().isoformat(timespec="seconds")}
 
     fin = collect_fin(corp["corp_code"], reps)
+    try:
+        fin["dividend"] = collect_dividend(corp["corp_code"], annual["year"])
+    except Exception as e:
+        print(f"[경고] 배당 수집 실패: {e}", file=sys.stderr)
     biz = get_biz(annual["rcept_no"])
     if not biz:
         print(f"[경고] '사업의 내용' 구간 {NF}", file=sys.stderr)
@@ -899,6 +1007,11 @@ def main():
 
     d = os.path.join(a.out, corp["stock_code"])
     os.makedirs(d, exist_ok=True)
+    try:
+        fin["segments"] = collect_segments(reps)
+        print(f"부문 비중 {len(fin['segments'])}개 보고서")
+    except Exception as e:
+        print(f"[경고] 부문 비중 수집 실패: {e}", file=sys.stderr)
     try:
         discs = list_disclosures(corp["corp_code"])
         print(f"주요 공시 {len(discs)}건, 원문 {save_disclosures(discs, d)}건 저장")
