@@ -147,7 +147,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
 
   // ------- 차트(SVG): 한 차트에 한 계열, 값 라벨은 막대 위, 전년 동기 대비는 라벨 아래
   var W = 480, H = 230, L = 38, R = 8, T = 22, B = 40;
-  function fmtN(v, u) { return u === "%" ? v.toFixed(1) + "%" : u === "원" ? Math.round(v).toLocaleString("ko-KR") : Math.round(v / 1e8).toLocaleString("ko-KR"); }
+  function fmtN(v, u) { return u === "%" ? v.toFixed(1) + "%" : (u === "원" || u === "주") ? Math.round(v).toLocaleString("ko-KR") : Math.round(v / 1e8).toLocaleString("ko-KR"); }
   function frame(vals, u, zero) {
     var mx = Math.max.apply(null, vals), mn = zero ? Math.min(0, Math.min.apply(null, vals)) : Math.min.apply(null, vals);
     if (u === "%") { mx = Math.max(mx, 0); mn = Math.min(mn, 0); }
@@ -159,7 +159,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     var s = "";
     for (var i = 0; i <= 3; i++) {
       var gv = f.mn + (f.mx - f.mn) * i / 3, gy = T + f.ph - (gv - f.mn) / (f.mx - f.mn) * f.ph;
-      s += "<line class='ax' x1='" + L + "' x2='" + (W - R) + "' y1='" + gy + "' y2='" + gy + "'/><text x='" + (L - 5) + "' y='" + (gy + 3.5) + "' text-anchor='end'>" + (u === "%" ? gv.toFixed(0) + "%" : u === "원" ? Math.round(gv).toLocaleString("ko-KR") : Math.round(gv / 1e8).toLocaleString("ko-KR")) + "</text>";
+      s += "<line class='ax' x1='" + L + "' x2='" + (W - R) + "' y1='" + gy + "' y2='" + gy + "'/><text x='" + (L - 5) + "' y='" + (gy + 3.5) + "' text-anchor='end'>" + (u === "%" ? gv.toFixed(0) + "%" : u === "주" ? (Math.abs(gv) >= 1e3 ? (gv / 1e4).toFixed(1) + "만" : Math.round(gv).toLocaleString("ko-KR")) : u === "원" ? Math.round(gv).toLocaleString("ko-KR") : Math.round(gv / 1e8).toLocaleString("ko-KR")) + "</text>";
     }
     return s;
   }
@@ -178,8 +178,8 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       if ((n - 1 - k) % (n > 10 ? 2 : 1) === 0) s += "<text x='" + cx + "' y='" + (H - 22) + "' text-anchor='middle'>" + esc(lb) + "</text>";
       if (v == null) return;
       var y1 = y(v), top = Math.min(y0, y1), h = Math.max(1.5, Math.abs(y0 - y1));
-      s += "<rect class='" + (v < 0 ? "bn" : "b2") + (k === n - 1 ? "" : " dim") + "' x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2'><title>" + esc(lb + " " + fmtN(v, u) + (u === "%" ? "" : u === "원" ? "원" : "억")) + "</title></rect>";
-      s += "<text class='vt' x='" + cx + "' y='" + (v >= 0 ? top - 4 : top + h + 11) + "' text-anchor='middle'>" + fmtN(v, u) + "</text>";
+      s += "<rect class='" + (v < 0 ? "bn" : "b2") + (k === n - 1 ? "" : " dim") + "' x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2'><title>" + esc(lb + " " + fmtN(v, u) + (u === "%" ? "" : (u === "원" || u === "주") ? u : "억")) + "</title></rect>";
+      if (v !== 0) s += "<text class='vt' x='" + cx + "' y='" + (v >= 0 ? top - 4 : top + h + 11) + "' text-anchor='middle'>" + fmtN(v, u) + "</text>";
       var bv = k >= 4 ? vals[k - 4] : (pre && pre[k] != null ? pre[k] : null);
       if (yoyBase && bv != null && bv > 0) {
         var g = (v - bv) / bv * 100;
@@ -459,6 +459,23 @@ h2.vd b { color: var(--accent); font-weight: 600; }
         "<div class='charts'>" + barOne("주당 현금배당금", "원 · 보통주", dv.years.map(String), dv.dps, "원", false, []) + lineMulti("배당성향", "% · 현금배당성향(연결 기준 공시값)", dv.years.map(String), [{ n: "배당성향", c: "var(--s2)", v: dv.payout }]) + "</div>");
     }
 
+    // 공급계약
+    var ct = s.ctr;
+    if (ct && ct.rows.length) {
+      var n12 = ct.rows.filter(function (r) { return r[1] === "체결" && r[0] >= String(parseInt(s.generated_at.slice(0, 4), 10) - 1) + s.generated_at.slice(5, 7) + s.generated_at.slice(8, 10); });
+      var s12 = n12.reduce(function (a, r) { return a + r[3]; }, 0), r0 = ct.rows[0];
+      var ctb = "<div class='scroll'><table><thead><tr><th>공시일</th><th>구분</th><th>상대방</th><th class='n'>금액 (억)</th><th class='n'>매출 대비</th><th>계약기간</th></tr></thead><tbody>" + ct.rows.slice(0, 12).map(function (r) { return "<tr><td>" + fdate(r[0]) + "</td><td style='white-space:nowrap'>" + esc(r[1]) + "</td><td>" + esc(r[2] || "–") + "</td><td class='n'>" + (r[3] / 1e8).toLocaleString("ko-KR", { maximumFractionDigits: 1 }) + "</td><td class='n'>" + (r[4] != null ? r[4].toFixed(1) + "%" : "–") + "</td><td>" + esc((r[5] || "") + (r[6] ? " ~ " + r[6] : "")) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      h += sec(s, "ctr", "새 계약은 얼마나 들어오나", "최근 12개월 체결 **" + n12.length + "건, 합계 " + eok(s12) + "억**. 가장 최근은 " + fdate(r0[0]) + " " + esc(r0[2] || "") + " " + eok(r0[3]) + "억(" + esc(r0[1]) + ").",
+        "<div class='charts'>" + (ct.v.some(function (v) { return v; }) ? barOne("공급계약 금액", "분기 · 억원 · 체결 합계(해지는 차감)", ct.labels, ct.v, "억", false, []) : "<div class='meta'>최근 5년간 체결 공시가 없어 추이 차트는 생략합니다(정정 공시만 있음).</div>") + "<div>" + ctb + "<div class='meta'>거래소 공시(단일판매·공급계약)에서 읽은 값입니다. 정정 공시는 합계에서 뺐습니다.</div></div></div>");
+    }
+    // 내부자 거래
+    var is = s.ins;
+    if (is && is.rows.length) {
+      var l0 = is.rows[0], sg_ = function (v) { return (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR"); };
+      var itb = "<div class='scroll'><table><thead><tr><th>공시일</th><th>보고사유</th><th>보고자</th><th>직위</th><th>거래일</th><th class='n'>단가 (원)</th><th class='n'>금액 (원)</th><th class='n'>변동 전</th><th class='n'>증감</th><th class='n'>변동 후</th></tr></thead><tbody>" + is.rows.slice(0, 15).map(function (r) { return "<tr><td>" + fdate(r[0].replace(/-/g, "")) + "</td><td>" + esc(r[3] || "–") + "</td><td>" + esc(r[1]) + "</td><td>" + esc(r[2] || "–") + "</td><td>" + esc(r[4]) + "</td><td class='n'>" + (r[5] != null ? Math.round(r[5]).toLocaleString("ko-KR") : "–") + "</td><td class='n " + cls(r[6]) + "'>" + (r[6] != null ? sg_(r[6]) : "–") + "</td><td class='n'>" + (r[7] != null ? Math.round(r[7]).toLocaleString("ko-KR") : "–") + "</td><td class='n " + cls(r[8]) + "'>" + sg_(r[8]) + "</td><td class='n'>" + (r[9] != null ? Math.round(r[9]).toLocaleString("ko-KR") : "–") + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      h += sec(s, "ins", "내부자는 사고 있나 팔고 있나", "최근 12개월 순증감 **" + sg_(is.net12) + "주**" + (is.amt12 ? "(거래대금 약 " + (is.amt12 / 1e8).toFixed(1) + "억원)" : "") + ", 매수 " + is.n_up + "건 · 매도 " + is.n_dn + "건. 마지막 거래 " + esc(l0[4]) + " " + esc(l0[1]) + " " + esc(l0[3] || "") + " " + sg_(l0[8]) + "주.",
+        "<div class='charts' style='grid-template-columns:minmax(0,640px)'>" + barOne("월별 순증감", "거래월 기준 · 주 · 최근 24개월", is.labels, is.v, "주", false, []) + "</div><h3>최근 거래 내역</h3>" + itb + "<div class='meta'>임원·주요주주 소유상황 보고서(DART)의 세부변동내역입니다. 금액은 단가 × 증감 주식 수로 계산했습니다.</div>");
+    }
     // 7 수주
     var ob = ordersBlock(s.orders);
     if (ob) h += "<section class='card sec' id='orders'><div class='q'>일감은 얼마나 쌓여 있나</div><h2 class='vd'>수주 현황 (공시 원문 표)</h2>" + ob + "</section>";
