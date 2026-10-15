@@ -446,6 +446,121 @@ def collect_segments(reps, maxn=20):
     return list(reversed(out))  # 과거 → 최신
 
 
+# ---------------------------------------------------------------- 내부자 거래 (DART elestock) · 공급계약 (거래소공시)
+def collect_insider(corp_code, d):
+    """임원·주요주주 특정증권 소유상황 보고 목록(증감 주식 수). 가격·보고사유는 원문에만 있어 최근 3건 원문을 insider_docs/ 에 저장(양식 확인용)."""
+    try:
+        j = get_json("elestock.json", corp_code=corp_code)
+    except RuntimeError:
+        return []
+    rows = []
+    for r in j.get("list") or []:
+        rows.append({"dt": r.get("rcept_dt"), "no": r.get("rcept_no"), "who": (r.get("repror") or "").strip(),
+                     "pos": (r.get("isu_exctv_ofcps") or r.get("isu_main_shrholdr") or "").strip(),
+                     "own": _num(r.get("sp_stock_lmp_cnt")), "chg": _num(r.get("sp_stock_lmp_irds_cnt")),
+                     "rate": _num(r.get("sp_stock_lmp_rate")), "crate": _num(r.get("sp_stock_lmp_irds_rate"))})
+    rows.sort(key=lambda x: (x["dt"] or "", x["no"] or ""), reverse=True)
+    rows = rows[:400]
+    try:
+        dd = os.path.join(d, "insider_docs")
+        os.makedirs(dd, exist_ok=True)
+        for r in [x for x in rows if x["chg"]][:3]:
+            fp = os.path.join(dd, f"{r['dt']}_{r['no']}.txt")
+            if not os.path.exists(fp):
+                open(fp, "w", encoding="utf-8").write("\n".join(to_text(fetch_doc(r["no"]))))
+    except Exception as e:
+        print(f"[경고] 내부자 원문 저장 실패: {e}", file=sys.stderr)
+    return rows
+
+
+def _cells(line):
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def parse_contract(lines):
+    """단일판매·공급계약(체결/해지) 공시 원문 표에서 금액·매출 대비·상대방·기간·계약일 추출. 금액 못 찾으면 None."""
+    amt = {}  # 우선순위: 확정 > 총액 > 일반
+    res = {}
+    for l in lines:
+        if not l.startswith("|"):
+            continue
+        cs = _cells(l)
+        if len(cs) < 2:
+            continue
+        lab, val = norm(" ".join(cs[:-1])), cs[-1]
+        mult = 1e6 if "백만원" in lab else 1e3 if "천원" in lab else 1.0
+        if "대비" in lab and "매출" in lab:
+            v = _num(val)
+            if v is not None:
+                res["pct"] = v
+        elif "최근매출액" in lab:
+            v = _num(val)
+            if v is not None:
+                res["rev"] = v * mult
+        elif re.search(r"(해지|계약)금액", lab) and "조건부" not in lab and "매출" not in lab and "비율" not in lab:
+            v = _num(val)
+            if v is not None:
+                pr = 0 if "확정" in lab else 1 if "총액" in lab else 2
+                if pr not in amt:
+                    amt[pr] = v * mult
+        elif "계약상대" in lab or ("회사명" in lab and "상대" in lab):
+            if val and val != "-" and "party" not in res:
+                res["party"] = val[:40]
+        elif lab.endswith("시작일") and re.search(r"\d{4}", val):
+            res["start"] = val
+        elif lab.endswith("종료일") and re.search(r"\d{4}", val):
+            res["end"] = val
+        elif re.search(r"계약\(수주\)일자|계약일자|해지일자", lab) and re.search(r"\d{4}", val):
+            res["date"] = val
+    if not amt:
+        return None
+    res["amt"] = amt[min(amt)]
+    return res
+
+
+def collect_contracts(corp_code, d, years=5, maxn=60):
+    """최근 years년 단일판매·공급계약 공시를 파싱(접수번호별 캐시). 반환: 최신순 목록."""
+    end = datetime.date.today()
+    bgn = end - datetime.timedelta(days=365 * years)
+    items, seen = [], set()
+    for page in range(1, 11):
+        j = get_json("list.json", corp_code=corp_code, bgn_de=bgn.strftime("%Y%m%d"), end_de=end.strftime("%Y%m%d"),
+                     pblntf_ty="I", page_no=page, page_count=100)
+        if j.get("status") != "000":
+            break
+        for it in j.get("list", []):
+            nm = it["report_nm"]
+            if re.search(r"단일판매|공급계약", nm) and it["rcept_no"] not in seen:
+                seen.add(it["rcept_no"])
+                items.append({"no": it["rcept_no"], "nm": nm.strip(), "dt": it["rcept_dt"]})
+        if page >= int(j.get("total_page", 1) or 1):
+            break
+    items.sort(key=lambda x: (x["dt"], x["no"]), reverse=True)
+    out, miss = [], 0
+    cd = os.path.join(CACHE, "contracts")
+    os.makedirs(cd, exist_ok=True)
+    for it in items[:maxn]:
+        fp = os.path.join(cd, f"{it['no']}.json")
+        if os.path.exists(fp):
+            p = json.load(open(fp, encoding="utf-8"))
+        else:
+            try:
+                lines = to_text(fetch_doc(it["no"]))
+            except RuntimeError:
+                continue
+            p = parse_contract(lines) or {}
+            if not p:
+                miss += 1
+                if miss <= 2:  # 양식 확인용 원문
+                    os.makedirs(os.path.join(d, "contract_docs"), exist_ok=True)
+                    open(os.path.join(d, "contract_docs", f"{it['dt']}_{it['no']}.txt"), "w", encoding="utf-8").write("\n".join(lines))
+            json.dump(p, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
+        if p.get("amt"):
+            out.append({**it, **p, "kind": "해지" if "해지" in it["nm"] else "정정" if "정정" in it["nm"] else "체결"})
+    print(f"공급계약 공시 {len(items)}건 중 금액 파싱 {len(out)}건")
+    return out
+
+
 def eok(v):
     return NF if v is None else f"{v / 1e8:,.0f}"
 
@@ -1010,6 +1125,15 @@ def main():
         print(f"부문 비중 {len(fin['segments'])}개 보고서")
     except Exception as e:
         print(f"[경고] 부문 비중 수집 실패: {e}", file=sys.stderr)
+    try:
+        fin["insider"] = collect_insider(corp["corp_code"], d)
+        print(f"내부자 보고 {len(fin['insider'])}건")
+    except Exception as e:
+        print(f"[경고] 내부자 수집 실패: {e}", file=sys.stderr)
+    try:
+        fin["contracts"] = collect_contracts(corp["corp_code"], d)
+    except Exception as e:
+        print(f"[경고] 공급계약 수집 실패: {e}", file=sys.stderr)
     try:
         discs = list_disclosures(corp["corp_code"])
         print(f"주요 공시 {len(discs)}건, 원문 {save_disclosures(discs, d)}건 저장")

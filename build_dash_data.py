@@ -90,6 +90,46 @@ def extra(base, meta, fin):
         ex["seg"] = {"keys": [s_["key"] for s_ in segs], "kinds": [s_["kind"] for s_ in segs],
                      "names": [re.sub(r"\s+", " ", names[n].replace("&cr", "")).strip() for n in order],
                      "values": [[{nseg(n): v for n, v in s_["items"].items()}.get(n) for s_ in segs] for n in order]}
+    ins = fin.get("insider") or []
+    if ins:
+        ch = [r for r in ins if r.get("chg")]
+        today = (meta.get("generated_at") or "")[:7]
+        yy, mm = int(today[:4]), int(today[5:7])
+        months = []
+        for _ in range(24):
+            months.append(f"{yy}{mm:02d}")
+            mm -= 1
+            if mm == 0:
+                yy, mm = yy - 1, 12
+        months.reverse()
+        net = {k: 0.0 for k in months}
+        for r in ch:
+            k = (r.get("dt") or "")[:6]
+            if k in net:
+                net[k] += r["chg"]
+        last12 = sum(net[k] for k in months[-12:])
+        ex["ins"] = {"rows": [[r["dt"], r["who"], r["pos"], r["chg"], r["own"], r["rate"]] for r in ch[:30]],
+                     "labels": [k[2:4] + "." + k[4:] for k in months], "v": [net[k] for k in months], "net12": last12,
+                     "n_up": sum(1 for r in ch if r["dt"][:6] in months[-12:] and r["chg"] > 0),
+                     "n_dn": sum(1 for r in ch if r["dt"][:6] in months[-12:] and r["chg"] < 0)}
+    ctr = fin.get("contracts") or []
+    if ctr:
+        def qk(r):
+            d_ = re.sub(r"\D", "", r.get("date") or r["dt"])[:8] or r["dt"]
+            return f"{d_[2:4]}.{(int(d_[4:6]) - 1) // 3 + 1}Q"
+        qs_ = []
+        yq = [int(meta["generated_at"][:4]), (int(meta["generated_at"][5:7]) - 1) // 3 + 1]
+        for _ in range(12):
+            qs_.append(f"{yq[0] % 100}.{yq[1]}Q")
+            yq = [yq[0] - 1, 4] if yq[1] == 1 else [yq[0], yq[1] - 1]
+        qs_.reverse()
+        qv = {k: 0.0 for k in qs_}
+        for r in ctr:
+            if r["kind"] == "정정" or qk(r) not in qv:
+                continue
+            qv[qk(r)] += -r["amt"] if r["kind"] == "해지" else r["amt"]
+        ex["ctr"] = {"rows": [[r["dt"], r["kind"], r.get("party", ""), r["amt"], r.get("pct"), r.get("start", ""), r.get("end", "")] for r in ctr[:30]],
+                     "labels": qs_, "v": [qv[k] for k in qs_]}
     try:
         p = json.load(open(os.path.join(base, "price.json"), encoding="utf-8"))
     except OSError:
