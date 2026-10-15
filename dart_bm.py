@@ -255,6 +255,7 @@ def pick_fin(rows):
                 names = [r.get("account_nm") for r in rows if r.get("sj_div") in divs][:12]
                 print(f"[경고] 매출액 계정 못 찾음. IS 계정 후보: {names}", file=sys.stderr)
         out[label] = found
+    out["_cf"] = [[r.get("account_nm"), to_int(r.get("thstrm_amount"))] for r in rows if r.get("sj_div") == "CF"]  # 현금흐름표 원 행(워터폴용)
     return out
 
 
