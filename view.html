@@ -516,6 +516,21 @@ h2.vd b { color: var(--accent); font-weight: 600; }
         "<div class='charts'>" + lineMulti("가동률 (연초 누적)", "% · 보고서 공시값 · 1Q는 3개월, 반기는 6개월 누적", cp.labels, cp.groups.slice(0, 4).map(function (g, i) { return { n: g.name.replace("부문", ""), c: cols[i], v: g.util }; })) +
         barOne(big[0].name.replace("부문", "") + " 분기 생산", "분기 · " + (big[0].unit || "") + " · 누적 생산실적의 차이", cp.labels, big[0].prod, "백만", true, []) + "</div><div class='meta'>생산능력(CAPA)·생산실적·가동률은 각 정기보고서의 '생산 및 설비' 표에서 읽었습니다. 보고서가 공시한 가동률은 연초부터의 누적값이라 분기마다 계산하면 가동일 기준 차이로 튀기 때문에 그대로 보여줍니다. 생산량만 누적 차이로 분기값을 계산했습니다.</div>");
     }
+    var cx_ = s.capex;
+    if (cx_ && (cx_.capex.length >= 3 || (cx_.notices && cx_.notices.length) || cx_.plan)) {
+      var cn = cx_.capex.length, ttm4 = function (a, j) { return j >= 3 && a.slice(j - 3, j + 1).every(ok) ? a.slice(j - 3, j + 1).reduce(function (x, y) { return x + y; }, 0) : null; };
+      var capT = cx_.capex.map(function (_, j) { return ttm4(cx_.capex, j); }), depT = (cx_.dep || []).map(function (_, j) { return ttm4(cx_.dep, j); });
+      var rat = capT.map(function (v, j) { return ok(v) && ok(depT[j]) && depT[j] > 0 ? v / depT[j] * 100 : null; });
+      var jr = rat.length - 1; while (jr >= 0 && !ok(rat[jr])) jr--;
+      var nb = "", ntb = "";
+      if (cx_.notices && cx_.notices.length) ntb = "<h3>시설투자 공시</h3><div class='scroll'><table><thead><tr><th>공시일</th><th>구분</th><th>내용</th><th class='n'>금액 (억)</th><th class='n'>자기자본 대비</th><th>기간</th></tr></thead><tbody>" + cx_.notices.map(function (r) { return "<tr><td>" + fdate(r[0]) + "</td><td>" + esc(r[1] || "–") + (r[8] ? " (철회)" : "") + "</td><td>" + esc((r[2] || r[7] || "–").slice(0, 60)) + "</td><td class='n'>" + eok(r[3]) + "</td><td class='n'>" + (r[4] != null ? r[4].toFixed(1) + "%" : "–") + "</td><td>" + esc((r[5] || "") + (r[6] ? " ~ " + r[6] : "")) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      var plan = cx_.plan ? "<p class='cap md'><b>설비 신설·매입 계획(보고서 원문)</b>: " + esc(cx_.plan) + "</p>" : "";
+      var fb = (cx_.facs && cx_.facs.length) ? "<details><summary>유형자산 증가 표 (원문, 단위는 표 캡션)</summary>" + cx_.facs.map(function (t) { return "<p class='cap md'><b>" + esc(t.caption) + "</b></p>" + md(t.rows.join("\n")); }).join("") + "</details>" : "";
+      var ctop = capT.length && ok(capT[capT.length - 1]) ? capT[capT.length - 1] : null;
+      h += sec(s, "capex", "설비에 얼마나 투자하고 있나", (ctop != null ? "최근 4분기 capex **" + Math.round(ctop).toLocaleString("ko-KR") + "억**(유·무형자산 취득)" + (jr >= 0 ? ", 감가상각의 **" + Math.round(rat[jr]) + "%**" + (jr >= 4 && ok(rat[jr - 4]) ? "(1년 전 " + Math.round(rat[jr - 4]) + "%)" : "") + (rat[jr] >= 100 ? " → 설비를 늘리는 구간." : " → 유지 수준 이하.") : ".") : "분기 capex를 계산할 현금흐름 자료가 부족합니다."),
+        (cn >= 3 ? "<div class='charts'>" + barOne("분기 capex", "분기 · 억원 · 유·무형자산 취득(현금흐름표)", cx_.labels, cx_.capex, "백만", false, []) + lineMulti("capex ÷ 감가상각 (TTM)", "% · 100% = 감가상각만큼 재투자(유지)", cx_.labels, [{ n: "capex ÷ 감가상각", c: "var(--s1)", v: rat }]) + "</div>" : "") + plan + ntb + fb +
+        "<div class='meta'>capex는 현금흐름표의 취득액(누적)을 분기로 바꾼 값이고, 감가상각은 비용의 성격별 분류에서 가져왔습니다. 시설투자 공시는 거래소 '신규시설투자등' 공시 기준입니다.</div>");
+    }
     // 8 변화·공시
     h += det("최근 주요 공시 (증자·사채·계약·자기주식 등)", md(s.secs.s62), true);
     h += det("바뀐 문구 (인접 보고서)", md(s.secs.s6), false);

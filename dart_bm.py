@@ -618,6 +618,153 @@ def collect_cost_raw(reps, maxn=20):
     return n
 
 
+# ---------------------------------------------------------------- 신규시설투자 공시 (거래소공시 '신규시설투자등')
+def parse_capex_notice(lines):
+    """신규시설투자등 공시 원문 표 → 투자구분·투자대상·금액·자기자본 대비·목적·기간. 금액 못 찾으면 None."""
+    res = {}
+    for i, l in enumerate(lines):
+        if not l.startswith("|"):
+            continue
+        cs = _cells(l)
+        if len(cs) < 2:
+            continue
+        lab, val = norm(" ".join(cs[:-1])), cs[-1]
+        mult = 1e6 if "백만원" in lab else 1e3 if "천원" in lab else 1.0
+        if "투자구분" in lab and "kind" not in res and val not in ("", "-"):
+            res["kind"] = val[:40]
+        elif re.search(r"투자대상|투자내역", lab) and val not in ("", "-") and "what" not in res and not re.search(r"^\d", val):
+            res["what"] = val[:80]
+        elif re.search(r"투자금액", lab) and "amt" not in res:
+            v = _num(val)
+            if v is not None:
+                res["amt"] = v * mult
+        elif "자기자본" in lab and "대비" in lab:
+            v = _num(val)
+            if v is not None:
+                res["pct"] = v
+        elif re.search(r"투자목적", lab) and val not in ("", "-") and "why" not in res:
+            res["why"] = val[:200]
+        elif lab.endswith("시작일") and re.search(r"\d{4}", val) and "start" not in res:
+            res["start"] = val
+        elif lab.endswith("종료일") and re.search(r"\d{4}", val) and "end" not in res:
+            res["end"] = val
+    return res if res.get("amt") else None
+
+
+def collect_capex_notices(corp_code, d, years=5, maxn=40):
+    end = datetime.date.today()
+    bgn = end - datetime.timedelta(days=365 * years)
+    items, seen = [], set()
+    for page in range(1, 11):
+        j = get_json("list.json", corp_code=corp_code, bgn_de=bgn.strftime("%Y%m%d"), end_de=end.strftime("%Y%m%d"),
+                     pblntf_ty="I", page_no=page, page_count=100)
+        if j.get("status") != "000":
+            break
+        for it in j.get("list", []):
+            if "신규시설투자" in it["report_nm"] and it["rcept_no"] not in seen:
+                seen.add(it["rcept_no"])
+                items.append({"no": it["rcept_no"], "nm": it["report_nm"].strip(), "dt": it["rcept_dt"]})
+        if page >= int(j.get("total_page", 1) or 1):
+            break
+    items.sort(key=lambda x: (x["dt"], x["no"]), reverse=True)
+    out, miss = [], 0
+    cd = os.path.join(CACHE, "capex")
+    os.makedirs(cd, exist_ok=True)
+    for it in items[:maxn]:
+        fp = os.path.join(cd, f"{it['no']}.json")
+        if os.path.exists(fp):
+            p = json.load(open(fp, encoding="utf-8"))
+        else:
+            try:
+                lines = to_text(fetch_doc(it["no"]))
+            except RuntimeError:
+                continue
+            p = parse_capex_notice(lines) or {}
+            if not p:
+                miss += 1
+            if (not p and miss <= 2) or len(out) < 1:  # 양식 확인용 원문
+                os.makedirs(os.path.join(d, "capex_docs"), exist_ok=True)
+                open(os.path.join(d, "capex_docs", f"{it['dt']}_{it['no']}.txt"), "w", encoding="utf-8").write("\n".join(lines))
+            json.dump(p, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
+        if p.get("amt"):
+            out.append({**it, **p, "cancel": bool(re.search(r"철회|취소", it["nm"])), "fix": "정정" in it["nm"]})
+    print(f"신규시설투자 공시 {len(items)}건 중 금액 파싱 {len(out)}건")
+    return out
+
+
+# ---------------------------------------------------------------- 내수·수출 매출 시계열 (사업의 내용 '매출 실적' 표)
+def region_from_lines(lines):
+    """'매출 실적' 표(구분 열에 내수/수출/합계)에서 당기(첫 숫자 열) 내수·수출 합계. 단위는 원으로 환산. 못 찾으면 None."""
+    blocks = split_blocks(lines)
+    dom = exp = 0.0
+    found = 0
+    prev_text = ""
+    for b in blocks:
+        if b["type"] == "text":
+            prev_text = b["text"]
+            continue
+        rows = b["rows"]
+        blob = " ".join(rows)
+        if not ("내수" in blob and "수출" in blob and ("합계" in blob or "합 계" in blob)):
+            continue
+        head = " ".join(rows[:2])
+        if not re.search(r"제\s*\d+\s*기|당기|반기|분기", head):
+            continue
+        ctx = (b.get("caption") or "") + " " + prev_text + " " + head
+        mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", ctx)
+        mult = {"백만원": 1e6, "천원": 1e3, "원": 1.0}.get(mu.group(1) if mu else "", None)
+        if mult is None:
+            continue
+        grp, tot = None, {}
+        for r in rows[1:]:
+            cells = [x.strip() for x in r.strip().strip("|").split("|")]
+            labs = {"내수": "dom", "국내": "dom", "수출": "exp", "해외": "exp"}
+            idx = None
+            for i, c in enumerate(cells[:3]):
+                if re.sub(r"\s+", "", c) in labs:
+                    idx = i
+                    break
+            if idx is None:
+                continue
+            if idx >= 1:  # 첫 칸이 그룹명(행 병합이 풀린 경우)
+                grp = re.sub(r"\s+", "", cells[0])
+                typ = re.sub(r"\s+", "", cells[1]) if idx == 2 else ""
+            else:
+                typ = ""
+            lab = labs[re.sub(r"\s+", "", cells[idx])]
+            vals = cells[idx + 1:]
+            v = None
+            for c in vals:
+                c2 = c.replace(",", "").strip()
+                if re.fullmatch(r"-?\d+(\.\d+)?", c2):
+                    v = float(c2)
+                    break
+                if c2 in ("-", ""):
+                    v = 0.0
+                    break
+            if v is None or grp is None:
+                continue
+            if grp in ("총계", "전체", "총합계") or (grp == "합계" and idx == 1):
+                tot.setdefault(grp, {})[lab] = tot.get(grp, {}).get(lab, 0.0) + v * mult
+        pick = tot.get("총계") or tot.get("전체") or tot.get("총합계") or tot.get("합계")
+        if pick and "dom" in pick and "exp" in pick:
+            dom, exp, found = pick["dom"], pick["exp"], 2
+    return {"dom": dom, "exp": exp} if found >= 2 and (dom + exp) > 0 else None
+
+
+def collect_region(reps, maxn=20):
+    out = []
+    for r in reps[:maxn]:
+        try:
+            b = get_biz(r["rcept_no"])
+        except RuntimeError:
+            continue
+        g = region_from_lines(b["all"]) if b else None
+        if g:
+            out.append({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"], **g})
+    return list(reversed(out))
+
+
 # ---------------------------------------------------------------- 내부자 거래 (DART elestock) · 공급계약 (거래소공시)
 def collect_insider(corp_code, d):
     """임원·주요주주 특정증권 소유상황 보고 목록(증감 주식 수). 가격·보고사유는 원문에만 있어 최근 3건 원문을 insider_docs/ 에 저장(양식 확인용)."""
@@ -1315,6 +1462,15 @@ def main():
 
     d = os.path.join(a.out, corp["stock_code"])
     os.makedirs(d, exist_ok=True)
+    try:
+        fin["capex_notices"] = collect_capex_notices(corp["corp_code"], d)
+    except Exception as e:
+        print(f"[경고] 시설투자 공시 수집 실패: {e}", file=sys.stderr)
+    try:
+        fin["region_hist"] = collect_region(reps)
+        print(f"내수·수출 {len(fin['region_hist'])}개 보고서")
+    except Exception as e:
+        print(f"[경고] 내수·수출 수집 실패: {e}", file=sys.stderr)
     try:
         fin["capa_hist"] = collect_capa(reps)
         print(f"가동률 {len(fin['capa_hist'])}개 보고서")

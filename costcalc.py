@@ -118,7 +118,7 @@ def build(rep, q20, overrides=None, semi=0.5):
     out = {"labels": [r["L"] for r in rows], "V": [r["V"] / 1e8 for r in rows], "S": [r["S"] / 1e8 for r in rows], "F": [r["F"] / 1e8 for r in rows],
            "R": [None if r["R"] is None else r["R"] / 1e8 for r in rows],
            "chk": [None if (r["R"] is None or r["O"] is None or not r["R"]) else (r["R"] - r["tc"] - r["O"]) / r["R"] * 100 for r in rows],
-           "semi": semi}
+           "dep": [sum(v for (sn, _), v in r["std"].items() if sn == "감가·상각") / 1e8 for r in rows], "semi": semi}
     t = {k: [] for k in ("cmA", "cmB", "bepA", "bepB", "R", "mosB", "fixB", "varB")}
     for i, r in enumerate(rows):
         w = rows[i - 3:i + 1] if i >= 3 else []

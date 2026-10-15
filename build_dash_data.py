@@ -235,6 +235,86 @@ def extra(base, meta, fin):
             ex["cost"] = cc
     except Exception as e:
         print("[경고] 비용 구조 계산 실패:", e)
+    rh = fin.get("region_hist") or []
+    if len(rh) >= 4:
+        rb = {o["key"]: o for o in rh}
+        rl, rd, re_ = [], [], []
+        for k_ in sorted(rb):
+            y_, m_ = int(k_[:4]), int(k_[5:])
+            if m_ == 3:
+                a_, b_ = rb[k_]["dom"], rb[k_]["exp"]
+            else:
+                pv_ = rb.get(f"{y_}.{m_-3:02d}")
+                if not pv_:
+                    continue
+                a_, b_ = rb[k_]["dom"] - pv_["dom"], rb[k_]["exp"] - pv_["exp"]
+            if a_ < 0 or b_ < 0:
+                continue
+            rl.append(f"{str(y_)[2:]}.{m_ // 3}Q"); rd.append(a_ / 1e8); re_.append(b_ / 1e8)
+        if len(rl) >= 4:
+            ex["region"] = {"labels": rl, "dom": rd, "exp": re_}
+    # capex (현금흐름표 취득액, 누적 → 분기) + 감가상각 대비, 시설투자 공시, 설비 계획·증가 표
+    try:
+        pr_ = fin.get("periods_raw") or {}
+        cum = {}
+        for k_, it_ in pr_.items():
+            rows_ = it_.get("_cf") or []
+            a_ = cfrow(rows_, r"^유형자산의?취득$|^유형자산취득$")
+            b_ = cfrow(rows_, r"^무형자산의?취득$|^무형자산취득$")
+            if a_ is not None or b_ is not None:
+                cum[k_] = (abs(a_ or 0), abs(b_ or 0))
+        cl, cp_, cq_ = [], [], []
+        for k_ in sorted(cum):
+            y_, m_ = int(k_[:4]), int(k_[5:])
+            if m_ == 3:
+                q_ = cum[k_]
+            else:
+                pk2 = cum.get(f"{y_}.{m_-3:02d}")
+                if not pk2:
+                    continue
+                q_ = (cum[k_][0] - pk2[0], cum[k_][1] - pk2[1])
+            cl.append(f"{str(y_)[2:]}.{m_ // 3}Q"); cp_.append((q_[0] + q_[1]) / 1e8); cq_.append(q_[0] / 1e8)
+        capx = {"labels": cl, "capex": cp_, "ppe": cq_}
+        dep_ = (ex.get("cost") or {})
+        if dep_.get("dep"):
+            dm = dict(zip(dep_["labels"], dep_["dep"]))
+            capx["dep"] = [dm.get(l) for l in cl]
+        notices = [[x["dt"], x.get("kind", ""), x.get("what", ""), x["amt"], x.get("pct"), x.get("start", ""), x.get("end", ""), x.get("why", ""), 1 if x.get("cancel") else 0]
+                   for x in (fin.get("capex_notices") or []) if not x.get("fix")][:12]
+        capx["notices"] = notices
+        txt = ""
+        try:
+            lines_ = open(os.path.join(base, "biz_latest.txt"), encoding="utf-8").read().split("\n")
+            for ln in lines_:
+                m2 = re.search(r"설비의\s*신설[ㆍ·]?\s*매입\s*계획", ln)
+                if m2:
+                    txt = ln[m2.end():m2.end() + 450].strip()
+                    txt = re.sub(r"\s*\d\.\s*매출.*$", "", txt)
+                    txt = re.sub(r"^등\s*", "", txt)
+                    break
+            facs, i_ = [], 0
+            while i_ < len(lines_):
+                if lines_[i_].startswith("|") and "기초장부가액" in lines_[i_]:
+                    j_ = i_
+                    while j_ < len(lines_) and lines_[j_].startswith("|"):
+                        j_ += 1
+                    cap_ = ""
+                    k2 = i_ - 1
+                    while k2 >= 0 and not lines_[k2].strip():
+                        k2 -= 1
+                    cap_ = lines_[k2].strip()[:80] if k2 >= 0 and not lines_[k2].startswith("|") else (lines_[k2].strip()[:80] if k2 >= 0 else "")
+                    facs.append({"caption": cap_, "rows": [r[:200] for r in lines_[i_:j_][:14]]})
+                    i_ = j_
+                    continue
+                i_ += 1
+            capx["facs"] = facs[:3]
+        except OSError:
+            pass
+        capx["plan"] = txt
+        if len(cl) >= 3 or notices or txt:
+            ex["capex"] = capx
+    except Exception as e:
+        print("[경고] capex 계산 실패:", e)
     try:
         p = json.load(open(os.path.join(base, "price.json"), encoding="utf-8"))
     except OSError:
