@@ -461,16 +461,39 @@ def collect_insider(corp_code, d):
                      "rate": _num(r.get("sp_stock_lmp_rate")), "crate": _num(r.get("sp_stock_lmp_irds_rate"))})
     rows.sort(key=lambda x: (x["dt"] or "", x["no"] or ""), reverse=True)
     rows = rows[:400]
-    try:
-        dd = os.path.join(d, "insider_docs")
-        os.makedirs(dd, exist_ok=True)
-        for r in [x for x in rows if x["chg"]][:3]:
-            fp = os.path.join(dd, f"{r['dt']}_{r['no']}.txt")
-            if not os.path.exists(fp):
-                open(fp, "w", encoding="utf-8").write("\n".join(to_text(fetch_doc(r["no"]))))
-    except Exception as e:
-        print(f"[경고] 내부자 원문 저장 실패: {e}", file=sys.stderr)
+    cd = os.path.join(CACHE, "insider")
+    os.makedirs(cd, exist_ok=True)
+    for r in [x for x in rows if x["chg"]][:80]:  # 최신 80건의 세부 변동내역(보고사유·단가)
+        fp = os.path.join(cd, f"{r['no']}.json")
+        try:
+            if os.path.exists(fp):
+                r["trades"] = json.load(open(fp, encoding="utf-8"))
+            else:
+                r["trades"] = parse_insider(to_text(fetch_doc(r["no"])))
+                json.dump(r["trades"], open(fp, "w", encoding="utf-8"), ensure_ascii=False)
+        except Exception as e:
+            print(f"[경고] 내부자 원문 {r['no']} 실패: {e}", file=sys.stderr)
     return rows
+
+
+DATE_RE = re.compile(r"(\d{4})\.(\d{2})\.(\d{2})")
+
+
+def parse_insider(lines):
+    """'다. 세부변동내역' 표: 보고사유 | 변동일 | 종류 | 변동전 | 증감 | 변동후 | 단가 | 비고. 단가가 없으면 None."""
+    out = []
+    for l in lines:
+        if not l.startswith("|"):
+            continue
+        c = _cells(l)
+        if len(c) < 7 or c[0].startswith("합") or not DATE_RE.search(c[1]):
+            continue
+        chg = _num(c[4])
+        if chg is None:
+            continue
+        out.append({"reason": c[0], "date": DATE_RE.search(c[1]).group(0).replace(".", "-"), "kind": c[2],
+                    "before": _num(c[3]), "chg": chg, "after": _num(c[5]), "price": _num(c[6])})
+    return out
 
 
 def _cells(line):

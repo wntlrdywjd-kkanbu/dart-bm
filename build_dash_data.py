@@ -92,7 +92,17 @@ def extra(base, meta, fin):
                      "values": [[{nseg(n): v for n, v in s_["items"].items()}.get(n) for s_ in segs] for n in order]}
     ins = fin.get("insider") or []
     if ins:
-        ch = [r for r in ins if r.get("chg")]
+        flat = []
+        for r in ins:
+            if not r.get("chg"):
+                continue
+            ts = r.get("trades") or []
+            if ts:
+                for t in ts:
+                    flat.append([r["dt"], r["who"], r["pos"], t["reason"], t["date"], t["price"], (t["price"] * t["chg"]) if t.get("price") else None, t["before"], t["chg"], t["after"]])
+            else:
+                flat.append([r["dt"], r["who"], r["pos"], "", r["dt"], None, None, None, r["chg"], r["own"]])
+        flat.sort(key=lambda x: (x[4], x[0]), reverse=True)
         today = (meta.get("generated_at") or "")[:7]
         yy, mm = int(today[:4]), int(today[5:7])
         months = []
@@ -103,15 +113,14 @@ def extra(base, meta, fin):
                 yy, mm = yy - 1, 12
         months.reverse()
         net = {k: 0.0 for k in months}
-        for r in ch:
-            k = (r.get("dt") or "")[:6]
+        for x in flat:
+            k = x[4].replace("-", "")[:6]
             if k in net:
-                net[k] += r["chg"]
-        last12 = sum(net[k] for k in months[-12:])
-        ex["ins"] = {"rows": [[r["dt"], r["who"], r["pos"], r["chg"], r["own"], r["rate"]] for r in ch[:30]],
-                     "labels": [k[2:4] + "." + k[4:] for k in months], "v": [net[k] for k in months], "net12": last12,
-                     "n_up": sum(1 for r in ch if r["dt"][:6] in months[-12:] and r["chg"] > 0),
-                     "n_dn": sum(1 for r in ch if r["dt"][:6] in months[-12:] and r["chg"] < 0)}
+                net[k] += x[8]
+        l12 = [x for x in flat if x[4].replace("-", "")[:6] in months[-12:]]
+        ex["ins"] = {"rows": flat[:40], "labels": [k[2:4] + "." + k[4:] for k in months], "v": [net[k] for k in months],
+                     "net12": sum(x[8] for x in l12), "amt12": sum(x[6] or 0 for x in l12),
+                     "n_up": sum(1 for x in l12 if x[8] > 0), "n_dn": sum(1 for x in l12 if x[8] < 0)}
     ctr = fin.get("contracts") or []
     if ctr:
         def qk(r):
