@@ -182,7 +182,8 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       var bv = k >= 4 ? vals[k - 4] : (pre && pre[k] != null ? pre[k] : null);
       if (yoyBase && bv != null && bv > 0) {
         var g = (v - bv) / bv * 100;
-        s += "<text class='" + (g >= 0 ? "gp" : "gn") + (n >= 12 ? " sm" : "") + "' x='" + cx + "' y='" + (H - 8) + "' text-anchor='middle'>" + (Math.abs(g) > 999 ? "–" : (g > 0 ? "+" : "") + Math.round(g) + (n >= 12 && k !== n - 1 ? "" : "%")) + "</text>";
+        if (n <= 13) s += "<text class='" + (g >= 0 ? "gp" : "gn") + " sm' x='" + cx + "' y='" + (v >= 0 ? top - 16 : y0 - 6) + "' text-anchor='middle'>" + (Math.abs(g) > 999 ? "–" : (g > 0 ? "+" : "") + Math.round(g) + "%") + "</text>";
+        if (n > 13) s += "<text class='" + (g >= 0 ? "gp" : "gn") + (n >= 12 ? " sm" : "") + "' x='" + cx + "' y='" + (H - 8) + "' text-anchor='middle'>" + (Math.abs(g) > 999 ? "–" : (g > 0 ? "+" : "") + Math.round(g) + (n >= 12 && k !== n - 1 ? "" : "%")) + "</text>";
       }
     });
     return chartBox(title, sub, s, title + " 분기 추이");

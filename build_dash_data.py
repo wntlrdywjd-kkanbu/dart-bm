@@ -109,6 +109,25 @@ def extra(base, meta, fin):
     return ex
 
 
+def diff_md(path):
+    """diff.txt 전체에서 보고서 구간별 핵심 문장을 '자르지 않고' 뽑아 대시보드용 마크다운으로(카드는 글자 수 제한으로 잘림)."""
+    try:
+        txt = open(path, encoding="utf-8").read()
+    except OSError:
+        return ""
+    out = []
+    for blk in re.split(r"(?m)^===== ", txt)[1:]:
+        head, _, rest = blk.partition("\n")
+        m = re.match(r"(.+?) \(신규 문장 (\d+)개", head)
+        if not m:
+            continue
+        rows = [re.match(r"\[(-?\d+)\] (.+)", l) for l in rest.split("\n")]
+        rows = [(int(r.group(1)), r.group(2).strip()) for r in rows if r]
+        pick = [t for sc, t in rows if sc > 0][:5] or [t for _, t in rows][:2]
+        out.append(f"[{m.group(1)}] 신규 문장 {m.group(2)}개 중 핵심\n" + "\n".join("- " + t for t in pick))
+    return "\n".join(out)
+
+
 def build(code):
     base = os.path.join(OUT, code)
     d = json.load(open(os.path.join(base, "fin.json"), encoding="utf-8"))
@@ -135,6 +154,9 @@ def build(code):
     except OSError:
         pass
     secs = sections(card)
+    dm = diff_md(os.path.join(base, "diff.txt"))
+    if dm:
+        secs["s6"] = dm
     # 한 줄 정의
     m = re.search(r"## 1\. .*?\n(.+?)\n\n", card, re.S)
     doc = {
