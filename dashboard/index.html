@@ -53,7 +53,7 @@ tr.row.on td { background: var(--accent-soft); }
 .kpi .d { font-size: 12px; font-family: var(--mono); }
 .head { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
 .head .nm { font-size: 20px; font-weight: 600; }
-.oneline { margin: 8px 0 0; max-width: 72ch; color: var(--ink); }
+.oneline { margin: 8px 0 0; max-width: 110ch; color: var(--ink); line-height: 1.7; } .overview p { margin: 8px 0 0; max-width: 110ch; line-height: 1.75; }
 .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 22px 18px; }
 svg { width: 100%; height: auto; display: block; }
@@ -80,7 +80,7 @@ svg .ln { stroke: var(--accent); stroke-width: 2; fill: none; } svg .pt { fill: 
 .sec .q, .glance .q { font-size: 12px; color: var(--muted); letter-spacing: .02em; margin-bottom: 4px; }
 h2.vd { font-size: 16.5px; line-height: 1.45; margin: 0 0 12px; max-width: 70ch; text-wrap: balance; }
 h2.vd b { color: var(--accent); font-weight: 600; }
-.tx p { margin: 0 0 8px; max-width: 72ch; } .tx b, .glance b, .notes b { background: var(--accent-soft); padding: 0 2px; font-weight: 600; }
+.tx { margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--line); } .tx h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); } .tx p { margin: 0 0 8px; max-width: 110ch; line-height: 1.7; } .tx b, .glance b, .notes b { background: var(--accent-soft); padding: 0 2px; font-weight: 600; }
 .glance ul { margin: 0 0 8px 18px; padding: 0; max-width: 78ch; } .glance li { margin: 5px 0; }
 .glance { border-color: var(--accent); }
 .sec .kpis { margin-bottom: 4px; }
@@ -178,7 +178,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       if (v == null) return;
       var y1 = y(v), top = Math.min(y0, y1), h = Math.max(1.5, Math.abs(y0 - y1));
       s += "<rect class='" + (v < 0 ? "bn" : "b2") + (k === n - 1 ? "" : " dim") + "' x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2'><title>" + esc(lb + " " + fmtN(v, u) + (u === "%" ? "" : (u === "원" || u === "주") ? u : u === "백만" ? "" : "억")) + "</title></rect>";
-      if (v !== 0) s += "<text class='vt' x='" + cx + "' y='" + (v >= 0 ? top - 4 : top + h + 11) + "' text-anchor='middle'>" + fmtN(v, u) + "</text>";
+      if (v !== 0 && (n <= 8 || k === n - 1)) s += "<text class='vt' x='" + cx + "' y='" + (v >= 0 ? top - 4 : top + h + 11) + "' text-anchor='middle'>" + fmtN(v, u) + "</text>";
       var bv = k >= 4 ? vals[k - 4] : (pre && pre[k] != null ? pre[k] : null);
       if (yoyBase && bv != null && bv !== 0) {
         var yt, yc;
@@ -187,7 +187,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
           yt = Math.abs(g) > 999 ? (v > 0 ? "×" + Math.round(v / bv) : "적전") : (g > 0 ? "+" : "") + Math.round(g) + "%";
           if (v < 0) yt = "적전";
         } else { yc = v > 0 ? "gp" : "gn"; yt = v > 0 ? "흑전" : "적자↓"; }
-        if (n <= 13) s += "<text class='" + yc + " sm' x='" + cx + "' y='" + (v >= 0 ? top - 16 : y0 - 6) + "' text-anchor='middle'>" + yt + "</text>";
+        if (n <= 13) s += "<text class='" + yc + " sm' x='" + cx + "' y='" + (v >= 0 ? top - (n <= 8 || k === n - 1 ? 16 : 4) : y0 - 6) + "' text-anchor='middle'>" + yt + "</text>";
         else if ((n - 1 - k) % 2 === 0) s += "<text class='" + yc + (n >= 12 ? " sm" : "") + "' x='" + cx + "' y='" + (H - 8) + "' text-anchor='middle'>" + (n >= 12 && k !== n - 1 && /%$/.test(yt) ? yt.slice(0, -1) : yt) + "</text>";
       }
     });
@@ -351,7 +351,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     var nt = s.notes && !Array.isArray(s.notes) ? s.notes : {};
     var hl = (nt.headlines || {})[key] || verdict, tx = (nt.texts || {})[key] || [];
     return "<section class='card sec' id='" + key + "'><div class='q'>" + esc(q) + "</div><h2 class='vd'>" + rich(hl) + "</h2>" +
-      (tx.length ? "<div class='tx'>" + tx.map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>" : "") + body + "</section>";
+      body + (tx.length ? "<div class='tx'><h3>부연 설명</h3>" + tx.map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>" : "") + "</section>";
   }
   function stat(l, v, sub, c) { return "<div class='kpi'><div class='l'>" + esc(l) + "</div><div class='v'>" + v + "</div><div class='d " + (c || "") + "'>" + (sub || "&nbsp;") + "</div></div>"; }
 
@@ -395,7 +395,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
         stat("PER", v.PER != null ? v.PER.toFixed(1) + "배" : "–", "TTM 순이익 기준") + stat("PBR", v.PBR != null ? v.PBR.toFixed(2) + "배" : "–", "자본총계 기준") +
         stat("PSR", v.PSR != null ? v.PSR.toFixed(2) + "배" : "–", "TTM 매출 기준") + stat("배당수익률", v.배당수익률 != null ? v.배당수익률.toFixed(2) + "%" : "–", "최근 DPS ÷ 종가") + "</div>";
     }
-    h += "<p class='oneline'>" + esc(s.one_line) + "</p><div class='meta'>사업 서술: " + esc(s.report) + " (" + fdate(s.report_dt) + ") · 최신: " + esc(s.latest) + " (" + fdate(s.latest_dt) + ") · 수집 " + esc((s.generated_at || "").slice(0, 10)) + " · 시세 " + (p ? p.date : "없음") + "</div></section>";
+    h += (nt.overview && nt.overview.length ? "<div class='overview'>" + nt.overview.map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>" : "<p class='oneline'>" + esc(s.one_line) + "</p>") + "<div class='meta'>사업 서술: " + esc(s.report) + " (" + fdate(s.report_dt) + ") · 최신: " + esc(s.latest) + " (" + fdate(s.latest_dt) + ") · 수집 " + esc((s.generated_at || "").slice(0, 10)) + " · 시세 " + (p ? p.date : "없음") + "</div></section>";
     // 한눈에 보기(Claude 작성) 또는 구 형식 분석 메모
     if (nt.glance) h += "<section class='card glance'><div class='q'>한눈에 보기</div><h2 class='vd'>" + rich(nt.glance.headline || "") + "</h2><ul>" + (nt.glance.points || []).map(function (t) { return "<li>" + rich(t) + "</li>"; }).join("") + "</ul><div class='meta'>Claude가 공시 원문을 읽고 정리했습니다. [추정]은 공시에 없는 해석입니다.</div></section>";
     var memos = Array.isArray(s.notes) ? s.notes : nt.memos;
@@ -437,6 +437,22 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     if (q.매출원가.some(ok)) h += sec(s, "cost", "이익은 어디서 새고 어디서 남나", "최근 4분기 원가율 **" + pct(cogR) + "**, 판관비율 " + pct(sgaR) + ". 매출총이익률 " + pct(last(gm)) + (ok(gm[i - 4]) ? "(" + pp(last(gm) - gm[i - 4]) + " vs 4분기 전)" : "") + ".",
       "<div class='charts'>" + costStack("비용 구성", "분기 · 억원", lastN(q.labels, 12), lastN(q.매출원가, 12), lastN(q.판관비, 12), lastN(q.영업이익, 12)) +
       lineMulti("마진 추이", "분기 · 매출 대비", q.labels, [{ n: "매출총이익률", c: "var(--s3)", v: gm }, { n: "영업이익률", c: "var(--s1)", v: qv }, { n: "순이익률", c: "var(--s2)", v: nm }]) + "</div>");
+
+    // 3-2 공헌이익·손익분기 (비용의 성격별 분류)
+    var cc = s.cost;
+    if (cc && cc.labels.length > 4 && cc.ttm.cmB.some(ok)) {
+      var tl = cc.ttm, li2 = cc.labels.length - 1;
+      var cmN = function (a) { var j = a.length - 1; while (j >= 0 && !ok(a[j])) j--; return j; };
+      var jb = cmN(tl.cmB), jp = jb >= 4 && ok(tl.cmB[jb - 4]) ? jb - 4 : -1;
+      var share = function (a) { var t = cc.V[li2] + cc.S[li2] + cc.F[li2]; return t ? a / t * 100 : null; };
+      var cls_c = { "변동": "var(--s1)", "준변동": "var(--s4)", "고정": "var(--s2)" };
+      var mt = "<div class='scroll'><table><thead><tr><th>표준 계정</th><th>분류</th><th class='n'>최근 4분기 (억)</th><th class='n'>비중</th><th>회사가 쓴 계정명</th></tr></thead><tbody>" + cc.map.map(function (r) { return "<tr><td>" + esc(r.std) + "</td><td>" + esc(r.cls) + "</td><td class='n'>" + r.amt.toFixed(1) + "</td><td class='n'>" + pct(r.share) + "</td><td>" + esc(r.raws.join(" · ")) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      h += sec(s, "cm", "매출이 늘면 이익은 얼마나 남고, 어디서부터 이익이 나나", "최근 4분기 공헌이익률 **" + pct(tl.cmB[jb]) + "**(준변동비 " + Math.round(cc.semi * 100) + "% 변동 가정, 변동비만 빼면 " + pct(tl.cmA[jb]) + "). 손익분기 매출 약 **" + Math.round(tl.bepB[jb]).toLocaleString("ko-KR") + "억**, 실제 매출 " + Math.round(tl.R[jb]).toLocaleString("ko-KR") + "억이라 안전여유 " + pct(tl.mosB[jb]) + (jp >= 0 ? "(1년 전 " + pct(tl.mosB[jp]) + ")" : "") + ". 준변동비를 전부 고정으로 보면 손익분기 " + Math.round(tl.bepA[jb]).toLocaleString("ko-KR") + "억, 안전여유 " + pct((tl.R[jb] - tl.bepA[jb]) / tl.R[jb] * 100) + ".",
+        "<div class='charts'>" + stackedPct("비용 구조 (변동·준변동·고정)", "최근 4분기 합 기준 · 비용의 성격별 분류", cc.labels.slice(3).map(function (l) { return "20" + l; }), ["변동비", "준변동비", "고정비"], [cc.V, cc.S, cc.F].map(function (a) { return a.map(function (_, j) { return j < 3 ? null : a[j] + a[j - 1] + a[j - 2] + a[j - 3]; }).slice(3); })) +
+        lineMulti("공헌이익률 (TTM)", "% · (매출 − 변동비) ÷ 매출 · 최근 4분기 합", cc.labels, [{ n: "변동비만 차감", c: "var(--s1)", v: tl.cmA }, { n: "준변동 " + Math.round(cc.semi * 100) + "% 포함", c: "var(--s2)", v: tl.cmB }]) +
+        lineMulti("손익분기 대비 안전여유 (TTM)", "% · (매출 − 손익분기 매출) ÷ 매출", cc.labels, [{ n: "안전여유", c: "var(--s3)", v: tl.mosB }]) + "</div>" +
+        "<h3>계정을 어떻게 나눴나</h3>" + mt + "<div class='meta'>회사마다 다른 계정명을 표준 계정으로 맞추고, 변동(재료·외주·물류)·준변동(인건비·경비)·고정(감가·임차·연구개발)으로 나눴습니다. 규칙은 코드에 고정돼 있고 종목별로 Claude가 검토해 바꿀 수 있습니다. 분류하지 못한 '기타비용'은 준변동으로 두었고 비중은 " + pct(cc.unclassified) + "입니다. 매출 − 비용 합계 = 영업이익이 맞는지(오차 " + Math.max.apply(null, cc.chk.filter(ok).map(Math.abs)).toFixed(2) + "%p 이내)로 검증했습니다.</div>");
+    }
 
     // 4 재무 건전성
     var bl = bs.labels.length - 1, d0 = function (k) { return bs[k][bl] != null && bs[k][0] != null ? bs[k][bl] - bs[k][0] : null; };
@@ -489,6 +505,16 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       h += sec(s, "orders", "일감은 얼마나 쌓여 있나", "수주잔고 **" + Math.round(bl[ol]).toLocaleString("ko-KR") + " " + esc(od.unit) + "**" + (gq2 != null ? ", 전분기 대비 " + (gq2 > 0 ? "+" : "") + gq2.toFixed(0) + "%" : "") + (gy2 != null ? ", 전년 동기 대비 " + (gy2 > 0 ? "+" : "") + gy2.toFixed(0) + "%" : "") + (nlast != null ? ". 이번 분기 신규수주(추정) " + Math.round(nlast).toLocaleString("ko-KR") + " " + esc(od.unit) : "") + ".",
         "<div class='charts'>" + barOne("수주잔고", "분기말 · " + od.unit + " · 아래 %는 전년 동기 대비", od.labels, bl, "백만", true, []) + barOne("신규수주 (추정)", "분기 · " + od.unit + " · 납품 + 잔고 증감", od.labels, od.new, "백만", true, []) + "</div><div class='meta'>각 정기보고서(분기·반기·사업)의 '수주상황' 합계 표에서 읽었습니다. 신규수주는 공시값이 아니라 분기 납품액(기납품액의 누적 차이)에 잔고 증감을 더한 추정치이고, 집계 기간이 맞지 않는 분기는 비워 두었습니다. 단위는 회사가 공시한 통화 기준입니다.</div>" + (ob ? "<details><summary>최신 수주 표 (원문)</summary>" + ob + "</details>" : ""));
     } else if (ob) h += "<section class='card sec' id='orders'><div class='q'>일감은 얼마나 쌓여 있나</div><h2 class='vd'>수주 현황 (공시 원문 표)</h2>" + ob + "</section>";
+    var cp = s.capa;
+    if (cp && cp.groups.length) {
+      var cl = cp.labels.length - 1, lt = function (g) { var j = g.util.length - 1; while (j >= 0 && g.util[j] == null) j--; return j; };
+      var gtxt = cp.groups.slice(0, 4).map(function (g) { var j = lt(g), jp = j >= 4 ? j - 4 : -1; return esc(g.name) + " **" + g.util[j].toFixed(1) + "%**" + (jp >= 0 && g.util[jp] != null ? "(" + pp(g.util[j] - g.util[jp]) + " vs 1년 전)" : ""); }).join(", ");
+      var cols = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
+      var big = cp.groups.slice(0, 2);
+      h += sec(s, "capa", "공장은 얼마나 돌아가나", "최신 연초 누적 가동률: " + gtxt + ".",
+        "<div class='charts'>" + lineMulti("가동률 (연초 누적)", "% · 보고서 공시값 · 1Q는 3개월, 반기는 6개월 누적", cp.labels, cp.groups.slice(0, 4).map(function (g, i) { return { n: g.name.replace("부문", ""), c: cols[i], v: g.util }; })) +
+        barOne(big[0].name.replace("부문", "") + " 분기 생산", "분기 · " + (big[0].unit || "") + " · 누적 생산실적의 차이", cp.labels, big[0].prod, "백만", true, []) + "</div><div class='meta'>생산능력(CAPA)·생산실적·가동률은 각 정기보고서의 '생산 및 설비' 표에서 읽었습니다. 보고서가 공시한 가동률은 연초부터의 누적값이라 분기마다 계산하면 가동일 기준 차이로 튀기 때문에 그대로 보여줍니다. 생산량만 누적 차이로 분기값을 계산했습니다.</div>");
+    }
     // 8 변화·공시
     h += det("최근 주요 공시 (증자·사채·계약·자기주식 등)", md(s.secs.s62), true);
     h += det("바뀐 문구 (인접 보고서)", md(s.secs.s6), false);

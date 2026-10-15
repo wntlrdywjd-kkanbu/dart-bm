@@ -585,11 +585,11 @@ def collect_cost_raw(reps, maxn=20):
     """각 보고서 전체 문서에서 '비용의 성격별 분류' 주석 표를 원문 그대로 저장(cache/cost/{rcept}.json). 불변 캐시."""
     cd = os.path.join(CACHE, "cost")
     os.makedirs(cd, exist_ok=True)
-    n = 0
+    n = []
     for r in reps[:maxn]:
         fp = os.path.join(cd, f"{r['rcept_no']}.json")
         if os.path.exists(fp):
-            n += 1
+            n.append(f"{r['rcept_no']}.json")
             continue
         try:
             lines = to_text(fetch_doc(r["rcept_no"]))
@@ -614,7 +614,7 @@ def collect_cost_raw(reps, maxn=20):
                 ctx.append(l.strip()[:160])
             i += 1
         json.dump({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"], "tables": out[:6]}, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
-        n += 1
+        n.append(f"{r['rcept_no']}.json")
     return n
 
 
@@ -1321,7 +1321,8 @@ def main():
     except Exception as e:
         print(f"[경고] 가동률 수집 실패: {e}", file=sys.stderr)
     try:
-        print(f"비용 주석 원문 {collect_cost_raw(reps)}개 보고서")
+        fin["cost_files"] = collect_cost_raw(reps)
+        print(f"비용 주석 원문 {len(fin['cost_files'])}개 보고서")
     except Exception as e:
         print(f"[경고] 비용 주석 수집 실패: {e}", file=sys.stderr)
     try:
