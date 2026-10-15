@@ -113,14 +113,16 @@ def extra(base, meta, fin):
                 yy, mm = yy - 1, 12
         months.reverse()
         net = {k: 0.0 for k in months}
+        mk = lambda x: (not x[3]) or any(w in x[3] for w in ("장내", "시간외", "장외"))
         for x in flat:
             k = x[4].replace("-", "")[:6]
-            if k in net:
+            if k in net and mk(x):
                 net[k] += x[8]
-        l12 = [x for x in flat if x[4].replace("-", "")[:6] in months[-12:]]
+        l12all = [x for x in flat if x[4].replace("-", "")[:6] in months[-12:]]
+        l12 = [x for x in l12all if mk(x)]
         ex["ins"] = {"rows": flat[:40], "labels": [k[2:4] + "." + k[4:] for k in months], "v": [net[k] for k in months],
                      "net12": sum(x[8] for x in l12), "amt12": sum(x[6] or 0 for x in l12),
-                     "n_up": sum(1 for x in l12 if x[8] > 0), "n_dn": sum(1 for x in l12 if x[8] < 0)}
+                     "n_up": sum(1 for x in l12 if x[8] > 0), "n_dn": sum(1 for x in l12 if x[8] < 0), "n_etc": len(l12all) - len(l12)}
     ctr = fin.get("contracts") or []
     if ctr:
         def qk(r):

@@ -145,7 +145,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
   }
 
   // ------- 차트(SVG): 한 차트에 한 계열, 값 라벨은 막대 위, 전년 동기 대비는 라벨 아래
-  var W = 480, H = 230, L = 38, R = 8, T = 22, B = 40;
+  var W = 480, H = 230, L = 44, R = 8, T = 22, B = 40;
   function fmtN(v, u) { return u === "%" ? v.toFixed(1) + "%" : (u === "원" || u === "주") ? Math.round(v).toLocaleString("ko-KR") : Math.round(v / 1e8).toLocaleString("ko-KR"); }
   function frame(vals, u, zero) {
     var mx = Math.max.apply(null, vals), mn = zero ? Math.min(0, Math.min.apply(null, vals)) : Math.min.apply(null, vals);
@@ -465,15 +465,15 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       var s12 = n12.reduce(function (a, r) { return a + r[3]; }, 0), r0 = ct.rows[0];
       var ctb = "<div class='scroll'><table><thead><tr><th>공시일</th><th>구분</th><th>상대방</th><th class='n'>금액 (억)</th><th class='n'>매출 대비</th><th>계약기간</th></tr></thead><tbody>" + ct.rows.slice(0, 12).map(function (r) { return "<tr><td>" + fdate(r[0]) + "</td><td style='white-space:nowrap'>" + esc(r[1]) + "</td><td>" + esc(r[2] || "–") + "</td><td class='n'>" + (r[3] / 1e8).toLocaleString("ko-KR", { maximumFractionDigits: 1 }) + "</td><td class='n'>" + (r[4] != null ? r[4].toFixed(1) + "%" : "–") + "</td><td>" + esc((r[5] || "") + (r[6] ? " ~ " + r[6] : "")) + "</td></tr>"; }).join("") + "</tbody></table></div>";
       h += sec(s, "ctr", "새 계약은 얼마나 들어오나", "최근 12개월 체결 **" + n12.length + "건, 합계 " + eok(s12) + "억**. 가장 최근은 " + fdate(r0[0]) + " " + esc(r0[2] || "") + " " + eok(r0[3]) + "억(" + esc(r0[1]) + ").",
-        "<div class='charts'>" + (ct.v.some(function (v) { return v; }) ? barOne("공급계약 금액", "분기 · 억원 · 체결 합계(해지는 차감)", ct.labels, ct.v, "억", false, []) : "<div class='meta'>최근 5년간 체결 공시가 없어 추이 차트는 생략합니다(정정 공시만 있음).</div>") + "<div>" + ctb + "<div class='meta'>거래소 공시(단일판매·공급계약)에서 읽은 값입니다. 정정 공시는 합계에서 뺐습니다.</div></div></div>");
+        "<div class='charts'>" + (ct.v.some(function (v) { return v; }) ? barOne("공급계약 금액", "분기 · 억원 · 체결 합계(해지는 차감)", ct.labels, ct.v, "억", false, []) : "<div class='meta'>최근 5년간 체결 공시가 없어 추이 차트는 생략합니다(정정·해지 공시만 있음).</div>") + "<div>" + ctb + "<div class='meta'>거래소 공시(단일판매·공급계약)에서 읽은 값입니다. 정정 공시는 합계에서 뺐습니다.</div></div></div>");
     }
     // 내부자 거래
     var is = s.ins;
     if (is && is.rows.length) {
-      var l0 = is.rows[0], sg_ = function (v) { return (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR"); };
+      var l0 = is.rows.filter(function (r) { return !r[3] || /장내|시간외|장외/.test(r[3]); })[0] || is.rows[0], sg_ = function (v) { return (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR"); };
       var itb = "<div class='scroll'><table><thead><tr><th>공시일</th><th>보고사유</th><th>보고자</th><th>직위</th><th>거래일</th><th class='n'>단가 (원)</th><th class='n'>금액 (원)</th><th class='n'>변동 전</th><th class='n'>증감</th><th class='n'>변동 후</th></tr></thead><tbody>" + is.rows.slice(0, 15).map(function (r) { return "<tr><td>" + fdate(r[0].replace(/-/g, "")) + "</td><td>" + esc(r[3] || "–") + "</td><td>" + esc(r[1]) + "</td><td>" + esc(r[2] || "–") + "</td><td>" + esc(r[4]) + "</td><td class='n'>" + (r[5] != null ? Math.round(r[5]).toLocaleString("ko-KR") : "–") + "</td><td class='n " + cls(r[6]) + "'>" + (r[6] != null ? sg_(r[6]) : "–") + "</td><td class='n'>" + (r[7] != null ? Math.round(r[7]).toLocaleString("ko-KR") : "–") + "</td><td class='n " + cls(r[8]) + "'>" + sg_(r[8]) + "</td><td class='n'>" + (r[9] != null ? Math.round(r[9]).toLocaleString("ko-KR") : "–") + "</td></tr>"; }).join("") + "</tbody></table></div>";
-      h += sec(s, "ins", "내부자는 사고 있나 팔고 있나", "최근 12개월 순증감 **" + sg_(is.net12) + "주**" + (is.amt12 ? "(거래대금 약 " + (is.amt12 / 1e8).toFixed(1) + "억원)" : "") + ", 매수 " + is.n_up + "건 · 매도 " + is.n_dn + "건. 마지막 거래 " + esc(l0[4]) + " " + esc(l0[1]) + " " + esc(l0[3] || "") + " " + sg_(l0[8]) + "주.",
-        "<div class='charts' style='grid-template-columns:minmax(0,640px)'>" + barOne("월별 순증감", "거래월 기준 · 주 · 최근 24개월", is.labels, is.v, "주", false, []) + "</div><h3>최근 거래 내역</h3>" + itb + "<div class='meta'>임원·주요주주 소유상황 보고서(DART)의 세부변동내역입니다. 금액은 단가 × 증감 주식 수로 계산했습니다.</div>");
+      h += sec(s, "ins", "내부자는 사고 있나 팔고 있나", "최근 12개월 순증감 **" + sg_(is.net12) + "주**" + (is.amt12 ? "(거래대금 약 " + (is.amt12 / 1e8).toFixed(1) + "억원)" : "") + ", 매수 " + is.n_up + "건 · 매도 " + is.n_dn + "건(장내·시간외 매매 기준" + (is.n_etc ? ", 주식보상·선임 등 기타 " + is.n_etc + "건 제외" : "") + "). 마지막 거래 " + esc(l0[4]) + " " + esc(l0[1]) + " " + esc(l0[3] || "") + " " + sg_(l0[8]) + "주.",
+        "<div class='charts' style='grid-template-columns:minmax(0,640px)'>" + barOne("월별 순증감", "거래월 기준 · 주 · 장내·시간외 매매만", is.labels, is.v, "주", false, []) + "</div><h3>최근 거래 내역</h3>" + itb + "<div class='meta'>임원·주요주주 소유상황 보고서(DART)의 세부변동내역입니다. 금액은 단가 × 증감 주식 수로 계산했습니다.</div>");
     }
     // 7 수주
     var ob = ordersBlock(s.orders);
