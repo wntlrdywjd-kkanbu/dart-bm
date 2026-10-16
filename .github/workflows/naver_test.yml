@@ -1,0 +1,32 @@
+name: naver_test
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: 네이버 리서치 접근 테스트
+        run: |
+          mkdir -p out
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          {
+            echo "== list 003160"
+            curl -s -m 30 -A "$UA" -o /tmp/l.html -w "http=%{http_code} size=%{size_download}\n" "https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemName=%EB%94%94%EC%95%84%EC%9D%B4&itemCode=003160"
+            iconv -f euc-kr -t utf-8 /tmp/l.html 2>/dev/null | sed 's/<[^>]*>/ /g' | tr -s ' \n' | head -c 3000
+            echo; echo "== pdf link sample"
+            grep -o 'href="[^"]*\.pdf"' /tmp/l.html | head -3
+            echo "== company_read"
+            grep -o 'company_read.naver?nid=[0-9]*[^"]*' /tmp/l.html | head -2
+          } > out/_naver_test.txt 2>&1
+      - name: 커밋
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add out/_naver_test.txt
+          git diff --cached --quiet || git commit -m "naver test"
+          git push
