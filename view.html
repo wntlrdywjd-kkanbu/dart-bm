@@ -87,6 +87,15 @@ h2.vd b { color: var(--accent); font-weight: 600; }
 .sec .kpis { margin-bottom: 4px; }
 .card .charts .scroll { margin-top: 4px; }
 @media (max-width: 520px) { h1 { font-size: 19px; } .kpi .v { font-size: 17px; } }
+
+  .cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 12px; }
+  ul.flow { margin: 0; padding-left: 18px; max-width: 110ch; line-height: 1.75; } ul.flow li { margin: 3px 0; }
+  details.rep { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 8px; min-width: 0; } details.rep.old { opacity: .8; }
+  details.rep > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; list-style: none; }
+  details.rep .rd { font-family: var(--mono); font-size: 12px; color: var(--muted); } details.rep .rb { font-weight: 600; } details.rep .rt { flex: 1 1 200px; min-width: 0; }
+  .tag { font-size: 11.5px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); } .tag.pos { color: var(--s3); } .tag.mid { color: var(--s1); }
+  .rmeta { font-size: 12.5px; color: var(--muted); margin: 8px 0 4px; } .rvs { margin: 6px 0; max-width: 110ch; } ul.rpts { margin: 6px 0; padding-left: 18px; max-width: 110ch; line-height: 1.7; } ul.rpts li { margin: 5px 0; }
+  table.est td { padding: 4px 9px; } .watch { margin: 8px 0 2px; padding: 8px 10px; border-left: 3px solid var(--s1); background: var(--bg); max-width: 110ch; line-height: 1.65; font-size: 13px; }
 </style>
 
 <div class="wrap" id="app">
@@ -544,10 +553,60 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     h += det("최근 주요 공시 (증자·사채·계약·자기주식 등)", md(s.secs.s62), true);
     h += det("바뀐 문구 (인접 보고서)", md(s.secs.s6), false);
     // 9 원문
+    if (rs && rs.code === s.code && rs.reports) h += researchBlock(rs);
     h += det("연간 재무표", annualTable(s), false);
     h += det("매출 구성과 부문 표 (원문)", md(s.secs.s2) + (s.secs.s21 ? "<h3>최신 정기보고서 (" + esc(s.latest) + ")</h3>" + md(s.secs.s21) : ""), false);
     h += det("고객·판매 구조", md(s.secs.s3), false) + det("원가 구조", md(s.secs.s4), false) + det("생산·설비·계약", md(s.secs.s5), false) + det("경쟁·시장", md(s.secs.s52), false);
     return h + "</article>";
+  }
+
+  // ------- 증권사 리포트 상세(비공개): 아티팩트 db 문서 view/research 가 있고 종목 코드가 같을 때만 표시. 공개 페이지에는 데이터가 없음
+  var rs = null;
+  function won(v) { return v == null ? "–" : Math.round(v).toLocaleString("ko-KR") + "원"; }
+  function researchChart(R) {
+    var pts = R.reports.filter(function (r) { return r.price && !r.old; }).slice().reverse();
+    if (pts.length < 2) return "";
+    var W = 640, H = 190, L = 44, B = 24, T = 10, pw = W - L - 10, ph = H - B - T;
+    var d0 = Date.parse(pts[0].date), d1 = Date.parse(pts[pts.length - 1].date), mx = 0;
+    pts.forEach(function (r) { mx = Math.max(mx, r.price, r.tp || 0); }); mx = Math.ceil(mx / 10000) * 10000;
+    function X(d) { return L + (Date.parse(d) - d0) / Math.max(1, d1 - d0) * (pw - 20) + 10; }
+    function Y(v) { return T + ph - v / mx * ph; }
+    var g = "";
+    for (var k = 0; k <= mx; k += 10000) g += "<line class='ax' x1='" + L + "' x2='" + (W - 6) + "' y1='" + Y(k) + "' y2='" + Y(k) + "'/><text x='" + (L - 5) + "' y='" + (Y(k) + 4) + "' text-anchor='end'>" + (k / 1000) + "천</text>";
+    var line = pts.map(function (r, i) { return (i ? "L" : "M") + X(r.date) + " " + Y(r.price); }).join(" ");
+    g += "<path d='" + line + "' fill='none' stroke='var(--s3)' stroke-width='2'/>";
+    pts.forEach(function (r) {
+      var x = X(r.date);
+      g += "<circle cx='" + x + "' cy='" + Y(r.price) + "' r='4' fill='var(--s3)' stroke='var(--surface)' stroke-width='2'><title>" + esc(r.date + " " + r.broker + " 작성일 주가 " + won(r.price)) + "</title></circle>";
+      if (r.tp) g += "<line x1='" + x + "' x2='" + x + "' y1='" + Y(r.price) + "' y2='" + Y(r.tp) + "' stroke='var(--muted)' stroke-dasharray='3 3'/><rect x='" + (x - 5) + "' y='" + (Y(r.tp) - 5) + "' width='10' height='10' transform='rotate(45 " + x + " " + Y(r.tp) + ")' fill='var(--s1)' stroke='var(--surface)' stroke-width='2'><title>" + esc(r.date + " " + r.broker + " 목표가 " + won(r.tp)) + "</title></rect>";
+      g += "<text x='" + x + "' y='" + (H - 8) + "' text-anchor='middle'>" + r.date.slice(2, 7).replace("-", ".") + "</text>";
+    });
+    return "<figure class='chart'><figcaption><b>목표가와 작성일 주가</b><span>◆ 목표가 · ● 리포트 작성일 주가 (원, 천 단위)</span></figcaption><svg viewBox='0 0 " + W + " " + H + "' role='img' aria-label='목표가와 작성일 주가'>" + g + "</svg></figure>";
+  }
+  function opChart(R) {
+    var a = R.op26 || []; if (a.length < 2) return "";
+    var mx = Math.max.apply(null, a.map(function (r) { return r.v; })), rowH = 24, W = 640, L = 100, pw = W - L - 70, h = a.length * rowH + 8, g = "";
+    a.forEach(function (r, i) { var y = 4 + i * rowH, w = r.v / mx * pw; g += "<text x='4' y='" + (y + 15) + "'>" + r.d + " " + esc(r.b) + "</text><rect x='" + L + "' y='" + y + "' width='" + w + "' height='17' rx='2' fill='" + (i === a.length - 1 ? "var(--s1)" : "var(--s3)") + "'><title>" + esc(r.d + " " + r.b + " 26년 영업이익 추정 " + r.v + "억") + "</title></rect><text class='vt' x='" + (L + w + 5) + "' y='" + (y + 13) + "'>" + r.v.toLocaleString("ko-KR") + "억</text>"; });
+    return "<figure class='chart'><figcaption><b>2026년 영업이익 추정치의 이동</b><span>리포트 시점별 · 억원</span></figcaption><svg viewBox='0 0 " + W + " " + h + "' role='img' aria-label='2026년 영업이익 추정치'>" + g + "</svg></figure>";
+  }
+  function researchBlock(R) {
+    var rp = R.reports, rec = rp.filter(function (r) { return !r.old; }), tps = rec.filter(function (r) { return r.tp; });
+    var last = rp[0];
+    var h = "<section class='card sec' id='research'><div class='q'>증권사 리포트 상세 (비공개 화면)</div><h2 class='vd'>" + esc(rec.length) + "건의 최근 리포트: 목표가 " + tps.slice().reverse().map(function (r) { return r.tp.toLocaleString("ko-KR"); }).filter(function (v, i, arr) { return i === 0 || v !== arr[i - 1]; }).join(" → ") + "원, 올해 영업이익 추정은 계속 상향</h2>";
+    h += "<div class='kpis'>" + stat("최근 리포트", esc(last.broker), esc(last.date)) + stat("최근 목표가", won(last.tp), last.price ? "작성일 주가 대비 " + sgn((last.tp / last.price - 1) * 100) : "") + stat("최저·최고 목표가", Math.round(Math.min.apply(null, tps.map(function (r) { return r.tp; })) / 1000) + "천 ~ " + Math.round(Math.max.apply(null, tps.map(function (r) { return r.tp; })) / 1000) + "천", "최근 1년 내 리포트") + "</div>";
+    h += "<div class='cols2'>" + researchChart(R) + opChart(R) + "</div>";
+    h += "<h3>톤 변화 흐름</h3><ul class='flow'>" + (R.tone_flow || []).map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>";
+    h += "<h3>한눈에 비교</h3><div class='scroll'><table><thead><tr><th>날짜</th><th>증권사</th><th>의견</th><th class='n'>목표가</th><th class='n'>작성일 주가</th><th>톤</th></tr></thead><tbody>" + rp.map(function (r) { return "<tr" + (r.old ? " class='old'" : "") + "><td>" + esc(r.date) + "</td><td>" + esc(r.broker) + "</td><td>" + esc(r.opinion) + "</td><td class='n'>" + won(r.tp) + "</td><td class='n'>" + won(r.price) + "</td><td>" + esc(r.tone) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+    h += "<h3>리포트별 상세</h3>";
+    rp.forEach(function (r, i) {
+      h += "<details class='rep" + (r.old ? " old" : "") + "'" + (i === 0 ? " open" : "") + "><summary><span class='rd'>" + esc(r.date) + "</span><span class='rb'>" + esc(r.broker) + "</span><span class='rt'>" + esc(r.title) + "</span><span class='tag " + (r.tone_c || "") + "'>" + esc(r.tone) + "</span></summary>";
+      h += "<div class='rmeta'>" + esc(r.opinion) + " · 목표가 " + won(r.tp) + " · 작성일 주가 " + won(r.price) + (r.tp && r.price ? " · 괴리 " + sgn((r.tp / r.price - 1) * 100) : "") + (r.analyst ? " · " + esc(r.analyst) : "") + "</div>";
+      h += "<p class='rvs'><b>직전 대비</b> " + rich(r.vs) + "</p><ul class='rpts'>" + r.points.map(function (t) { return "<li>" + rich(t) + "</li>"; }).join("") + "</ul>";
+      if (r.est && r.est.length) h += "<div class='scroll'><table class='est'><tbody>" + r.est.map(function (e) { return "<tr><td>" + esc(e.k) + "</td><td class='n'>" + esc(e.v) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      if (r.watch) h += "<p class='watch'>" + rich(r.watch) + "</p>";
+      h += "</details>";
+    });
+    return h + "<div class='meta'>" + esc(R.caveat || "") + " " + esc(R.note || "") + " 갱신 " + esc(R.updated || "") + "</div></section>";
   }
   function sum4(a, i) { var w = a.slice(Math.max(0, i - 3), i + 1); return w.length === 4 && w.every(ok) ? w.reduce(function (x, y) { return x + y; }, 0) : null; }
 
