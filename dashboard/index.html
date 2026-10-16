@@ -642,9 +642,12 @@ h2.vd b { color: var(--accent); font-weight: 600; }
   // 종목 전환: view/index(목록) + stocks/{code}(분석) + research/{code}(증권사 리포트, 선택). 예전 view/current 는 목록이 없을 때만 사용
   var idx = null, sel = null, unsubS = null, unsubR = null;
   function pickCode() {
-    var c = null; try { c = localStorage.getItem("bm_sel"); } catch (e) { }
-    if (c && idx.items.some(function (i) { return i.code === c; })) return c;
-    return idx.last || idx.items[0].code;
+    // 새 분석이 올라오면(view/index 의 last 가 바뀌면) 그 종목을 먼저 보여주고, 이후에는 사용자가 마지막으로 고른 종목을 기억
+    var c = null, seen = null; try { c = localStorage.getItem("bm_sel"); seen = localStorage.getItem("bm_last"); } catch (e) { }
+    var has = function (x) { return x && idx.items.some(function (i) { return i.code === x; }); };
+    if (idx.last && has(idx.last) && idx.last !== seen) { try { localStorage.setItem("bm_last", idx.last); } catch (e) { } return idx.last; }
+    if (has(c)) return c;
+    return has(idx.last) ? idx.last : idx.items[0].code;
   }
   function openStock(db, code) {
     sel = code; try { localStorage.setItem("bm_sel", code); } catch (e) { }
