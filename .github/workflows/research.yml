@@ -1,0 +1,51 @@
+name: research
+on:
+  workflow_dispatch:
+    inputs:
+      codes:
+        description: "종목코드 6자리 (여러 개는 공백으로 구분). 예: 003160 085910"
+        required: true
+      n:
+        description: "종목당 최근 리포트 수 (기본 10)"
+        required: false
+        default: "10"
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wntlrdywjd-kkanbu/dart-bm-private
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          path: private
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: sudo apt-get install -y -qq poppler-utils && pip install pypdf
+      - name: 리서치 수집
+        env:
+          CODES: ${{ inputs.codes }}
+          RESEARCH_N: ${{ inputs.n }}
+          PRIVATE_DIR: private
+        run: python research.py $CODES 2>&1 | tee out/last_research.log; exit ${PIPESTATUS[0]}
+      - name: 비공개 저장소 커밋 (본문)
+        if: always()
+        working-directory: private
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "research: ${{ inputs.codes }}"
+          git push
+      - name: 공개 저장소 커밋 (메타만)
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add out/*/research.json out/last_research.log
+          git diff --cached --quiet || git commit -m "research meta: ${{ inputs.codes }}"
+          git pull -q --rebase && git push
