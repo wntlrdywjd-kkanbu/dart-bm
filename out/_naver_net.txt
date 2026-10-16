@@ -1,0 +1,207 @@
+#### https://m.stock.naver.com/domestic/stock/085910/research
+200 document https://m.stock.naver.com/domestic/stock/085910/research
+    
+200 xhr https://m.stock.naver.com/front-api/auth/userInfo
+    {"isSuccess":true,"detailCode":"","message":"","result":{"isLogin":false,"isAgreementYn":"","isAdult":false,"userId":"","nidNo":"","realNameVerified":"","name":"","age":""}}
+200 xhr https://m.stock.naver.com/front-api/notice/banner?type=domestic%2Fresearch
+    {"isSuccess":true,"detailCode":"","message":"","result":[]}
+200 xhr https://m.stock.naver.com/front-api/opentalk/channelInfo?code=085910
+    {"isSuccess":false,"result":{},"detailCode":"FE-4002","message":"오픈톡이 개설되지 않은 종목입니다."}
+200 xhr https://m.stock.naver.com/front-api/ranking/dailyAccumulated/check?itemCode=085910
+    {"isSuccess":true,"detailCode":"","message":"","result":{"included":false,"businessDay":true}}
+401 xhr https://m.stock.naver.com/front-api/my/recent
+    {"detailCode":"","message":"user not authenticated"}
+400 xhr https://m.stock.naver.com/front-api/ranking/rdcToken
+    {"detailCode":"","message":"Request failed with status code 400"}
+200 xhr https://m.stock.naver.com/front-api/setting/wtsList
+    {"isSuccess":true,"detailCode":"","message":"","result":{"connectedList":[],"disconnectedList":[{"id":39,"mydataCode":"C1AADA0000","name":"KB증권","domesticUrlPattern":"https://viewapi.kbsec.com/go.able?linkcd=n000000&stockCode={itemCode}","domesticDefaultUrl":"https://viewapi.kbsec.com/go.able?linkcd=n000000&stockCode=035420","nlogTag":"kb","domesticExposure":true,"foreignExposure":false},{"id":26,"mydataCode":"C1AACU0000","name":"미래에셋증권","domesticUrlPattern":"https://nswts.securities.miraeasset.com/wts/Main.do?stock={itemCode}","domesticDefaultUrl":"https://nswts.securities.miraeasset.com/wts/Main.do?stock=035420","foreignUrlPattern":"https://nswts.securities.miraeasset.com/wts/Main.do?stock
+200 xhr https://m.stock.naver.com/front-api/chart/domesticPriceByTime/marketInfo?chartInfoType=item&reutersCode=085910&timeFrame=minute5&exchangeType=KRX
+    {"isSuccess":true,"detailCode":"","message":"","result":{"priceInfos":[{"localDateTime":"20261016090000","currentPrice":18820,"openPrice":19190,"highPrice":19200,"lowPrice":18070,"accumulatedTradingVolume":62064},{"localDateTime":"20261016090500","currentPrice":18690,"openPrice":18680,"highPrice":19340,"lowPrice":18680,"accumulatedTradingVolume":12472},{"localDateTime":"20261016091000","currentPrice":18180,"openPrice":18690,"highPrice":18810,"lowPrice":18070,"accumulatedTradingVolume":20805},{"localDateTime":"20261016091500","currentPrice":18610,"openPrice":18240,"highPrice":18630,"lowPrice":18160,"accumulatedTradingVolume":3468},{"localDateTime":"20261016092000","currentPrice":18390,"openPr
+200 xhr https://m.stock.naver.com/front-api/myAsset/status
+    {"isSuccess":true,"detailCode":"","message":"","result":{"isLogin":false}}
+200 xhr https://m.stock.naver.com/front-api/research/stockList?itemCode=085910&pageSize=50&page=1
+    {"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"085910","itemName":"네오티스","researchId":91065,"title":"마이크로비트 사업을 통한 실적 퀀텀점프","brokerName":"한국IR협의회","writeDate":"2026-03-25","readCount":"13933","previewContent":"■ AI 인프라 투자 확대 → PCB 수요 증가 → 마이크로비트 수요 증가로 이어지면서 네오티스 마이크로비트 실적 구조적 성장 국면 진입■ AI PCB용 고부가 마이크로비트 제품 "},{"researchCategory":"종목분석","category":"종목분석","itemCode":"085910","itemName":"네오티스","researchId":77077,"title":"초정밀 기술의 지속 개발로 신사업 도전","brokerName":"나이스디앤비","writeDate":"2024-09-13","readCount":"7126","previewContent":"■ 자동차 부품, 공작기계용 절삭 공구 등을 통해 매출 시현■ 차종의 상급화, 편의사양의 다양화로 성장 중인 모터 샤프트 시장■ KG모빌리티 신차 액티언 전장부품 공급으로 신사업 "}
+200 xhr https://m.stock.naver.com/front-api/realTime/unified
+    {"isSuccess":true,"detailCode":"","message":"","result":{"items":{"085910":{"id":"085910","name":"네오티스","stockEndType":"stock","stockExchangeType":"KRX","marketType":"KOSDAQ","feModelType":"domestic","itemCode":"085910","currentPrice":20750,"currencyType":"KRW","fluctuationsType":"RISING","fluctuations":"2800","fluctuationsRatio":"15.60","tradableStatus":"tradable","accumulatedTradingVolume":493779,"accumulatedTradingValue":9781000000,"marketValue":286242473500,"marketStatus":"OPEN","localTradedAt":"2026-10-16T16:56:23+09:00","isNxt":false,"krxNxtIntegratedPriceInfo":{"openPrice":19190,"highPrice":21900,"lowPrice":18070,"highPriceOf52Weeks":36300,"lowPriceOf52Weeks":3890,"originalHighPriceOf
+200 xhr https://m.stock.naver.com/front-api/fuc?service=stock&page=stock_detail&area=domestic_feed
+    {"isSuccess":true,"detailCode":"","message":"","result":[{"contents":[],"area":{"service":"stock","page":"stock_detail","area":"domestic_feed","alias":"국내 종목상세 피드배너","contentTemplateIds":["infeed_banner_image"],"contentTemplateVersion":1,"slotCount":3,"slotType":"","orderType":"WEIGHT","width":0,"height":0,"metaData":{},"selectedPlugin":[],"areaService":"","maxWidth":0,"maxHeight":0,"maxDynamicContents":3,"pageOrder":2147483647,"useLocationBasedService":false,"id":"stock|stock_detail|domestic_feed","impressionServiceCode":"fuc-stock","isAd":false},"contentTemplates":[{"id":"infeed_banner_image","metaData":[{"elementId":"image","elementType":"image","values":[{"key":"width","value":"680"},{"k
+---- body text
+네이버
+네이버페이
+증권
+메뉴모음
+종목 검색
+검색
+전체메뉴
+마켓
+MY
+국내
+현재 위치
+해외
+공모주
+토론
+지표
+가상자산
+투자정보
+
+
+네오티스 종목정보
+종목코드
+085910
+코스닥
+투자주의
+네오티스
+20,750원
++2,800(15.60%)
+2026. 10. 16. 16:56애프터마켓
+도움말 보기
+알림 설정
+관심종목 추가
+간편주문
+도움말 보기
+1일
+선택됨
+1주
+1개월
+3개월
+6개월
+1년
+3년
+5년
+10년
+막대차트보기
+확대해서 보기
+종합
+토론
+뉴스·공시
+시세
+재무
+리서치
+현재 위치
+마이크로비트 사업을 통한 실적 퀀텀점프
+한국IR협의회2026.03.25.조회 13,933
+초정밀 기술의 지속 개발로 신사업 도전
+나이스디앤비2024.09.13.조회 7,126
+마이크로 비트 자동차 모터용 샤프트 전문 기업
+NICE평가정보2020.12.31.조회 10,276
+자동차 모터용 샤프트의 신규 설비투자로 매출확대 기대
+NICE평가정보2019.12.12.조회 6,026
+숨은 강자 찾기
+골든브릿지증권2011.11.30.조회 5,426
+신성장 동력의 성과 가시화 지속
+골든브릿지증권2011.08.31.조회 4,146
+신성장동력에 충분히 주목할 수 있다
+브릿지증권2011.05.31.조회 3,915
+샤프트 부문의 매출신장세에 주목해야
+에프앤가이드2010.11.30.조회 3,894
+마이크로비트 매출 전분기대비 회복세
+에프앤가이드2010.08.27.조회 1,046
+선택과 집중의 결과, 마이크로드릴비트 사업 성장중
+에프앤가이드2009.11.25.조회 1,030
+마이크로드릴비트 예상대로 큰 폭의 성장세
+에프앤가이드2009.08.19.조회 789
+마이크로드릴비트 새로운 성장모멘텀
+에프앤가이드2009.05.14.조회 952
+샤프트 사업, 전 세계 자동차 시장과 함께 가자!
+대우증권2008.09.24.조회 1,218
+실적 안정성과 09년 성장성을 겸비
+대우증권2008.09.13.조회 841
+2008년은 새로운 도약을 준비하는 원년
+대우증권2008.05.15.조회 863
+
+목록의 마지막입니다.
+
+
+
+로그인전체서비스공지사항증권 고객센터토론 운영원칙약관 및 정책개인정보 처리방침오류신고
+네이버파이낸셜㈜가 제공하는 금융 관련 정보는 콘텐츠 제공업체
+툴팁 보기
+로부터 받는 정보로 투자 참고사항이며, 오류가 발생하거나 지연될 수 있습니다. 네이버파이낸셜㈜는 제공된 정보에 의한 투자결과에 법적책임을 지지 않습니다. 게시된 정보는 무단으로 배포할 수 없습니다.
+네이버파이낸셜㈜ 사업자 정보
+펼치기
+Npay앱 다운로드
+
+네오티스 - Npay 증권
+---- links
+https://m.stock.naver.com/domestic/stock/085910/research/91065?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/77077?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/55687?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/52091?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/14763?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/13709?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/12615?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/10553?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/9485?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/6828?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/5718?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/4490?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/2279?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/2197?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/1629?domesticStockExchange=KRX
+#### https://m.stock.naver.com/domestic/stock/085910/research/91065?domesticStockExchange=KRX
+200 document https://m.stock.naver.com/domestic/stock/085910/research/91065?domesticStockExchange=KRX
+    
+200 xhr https://m.stock.naver.com/front-api/research/stockEnd?itemCode=085910&researchId=91065
+    {"isSuccess":true,"detailCode":"","message":"","result":{"researchContent":{"itemCode":"085910","itemName":"네오티스","researchId":91065,"title":"마이크로비트 사업을 통한 실적 퀀텀점프","brokerName":"한국IR협의회","writeDate":"2026-03-25","readCount":"13933","attachUrl":"https://stock.pstatic.net/stock-research/company/74/20260325_company_56899000.pdf","content":"<p>■ AI 인프라 투자 확대 → PCB 수요 증가 → 마이크로비트 수요 증가로 이어지면서 네오티스 마이크로비트 실적 구조적 성장 국면 진입<br>■ AI PCB용 고부가 마이크로비트 제품 비중 확대, 판가인상 영향에 따른 ASP 상승과 함께 케파 확대에 따른 판매량(Q) 동반 상승 기대<br>■ 국내 업체 중 유일한 마이크로비트 제조사로, 20년 이상 축적된 초정밀 가공 기술과 대형 PCB 고객 기반을 바탕으로 시장점유율 1위 확보<br>■ 마이크로비트 사업을 중심으로 실적이 크게 성장하면서 2026년 매출액과 영업이익 모두 사상 최대치를 기록할 것으로 전망</p>","opinion":"없음"},"researchSummaries":[
+200 xhr https://m.stock.naver.com/front-api/news/category?category=ranknews&page=1&pageSize=5
+    {"isSuccess":true,"detailCode":"","message":"","result":[{"id":"","articleId":"0005749480","body":"적정 주가 제시에 진행자도 “네?” 삼전닉스, 전날 급락 뒤 16일 반등 삼성전자와 SK하이닉스 주가가 지난 15일 급락한 뒤 16일 반등한 가운데, 일주일 전 두 회사의 적정 주가를 각각 7만원과 20만원으로 제시한 한 애널리스트 발언이 온라인에서 화제를 모으고 있다. 지난 8일 방송된 SBS Biz ‘머니쇼’에서 이주완 인더스트리 애널리스트는 삼성...","datetime":"20261016103107","officeId":"009","imageOriginLink":"https://imgnews.pstatic.net/image/origin/009/2026/10/16/5749480.jpg?type=nf206_146","title":"“7만전자·20만닉스 적정”…방송서 침묵 흐르게 한 애널리스트 발언","titleFull":"“7만전자·20만닉스 적정”…방송서 침묵 흐르게 한 애널리스트 발언","officeName":"매일경제","isVideo":false,"hasImage":true,"type":1,"photoType":1},{"id":"","articleId":"0001269390","body":"중국 반도체 업체 창신메모리(CXMT)의 차세대 D램 기술 
+200 other https://ssl.pstatic.net/imgstock/fn/real/_next/static/chunks/pages/pdf-97198fc6c580544d.js
+    
+200 script https://ssl.pstatic.net/imgstock/fn/real/_next/static/chunks/pages/pdf-97198fc6c580544d.js
+    
+---- body text
+네이버페이
+네오티스
+뒤로가기
+
+
+마이크로비트 사업을 통한 실적 퀀텀점프
+한국IR협의회
+2026.03.25.
+조회 13,933
+PDF 보기
+가
+가
+글자 크기 변경
+공유
+투자의견
+없음
+목표주가
+없음
+
+■ AI 인프라 투자 확대 → PCB 수요 증가 → 마이크로비트 수요 증가로 이어지면서 네오티스 마이크로비트 실적 구조적 성장 국면 진입
+■ AI PCB용 고부가 마이크로비트 제품 비중 확대, 판가인상 영향에 따른 ASP 상승과 함께 케파 확대에 따른 판매량(Q) 동반 상승 기대
+■ 국내 업체 중 유일한 마이크로비트 제조사로, 20년 이상 축적된 초정밀 가공 기술과 대형 PCB 고객 기반을 바탕으로 시장점유율 1위 확보
+■ 마이크로비트 사업을 중심으로 실적이 크게 성장하면서 2026년 매출액과 영업이익 모두 사상 최대치를 기록할 것으로 전망
+
+네오티스 리서치
+마이크로비트 사업을 통한 실적 퀀텀점프
+한국IR협의회2026.03.25.조회 13,933
+초정밀 기술의 지속 개발로 신사업 도전
+나이스디앤비2024.09.13.조회 7,126
+마이크로 비트 자동차 모터용 샤프트 전문 기업
+NICE평가정보2020.12.31.조회 10,276
+자동차 모터용 샤프트의 신규 설비투자로 매출확대 기대
+NICE평가정보2019.12.12.조회 6,026
+숨은 강자 찾기
+골든브릿지증권2011.11.30.조회 5,426
+전체 목록 보기
+많이 본 뉴스
+“7만전자·20만닉스 적정”…방송서 침묵 흐르게 한 애널리스트 발언
+매일경제오전 10:31
+괜히 겁먹고 던졌나…"중국 기술은 종이호랑이"
+한국경제TV오후 12:09
+은퇴 후 '따박따박' 월 200만, 그런데 사람 만나기는 싫다면?
+한국일보오후 2:01
+개미들 피눈물 흘리는데 "삼전 10만원까지 떨어져라"…무슨 일?
+이데일리2026.10.15.
+“코스피 0.66% 빠졌는데 전액손실”…200배 레버리지 등장했다는데
+매일경제오후 2:57
+많이 본 뉴스 보러가기
+---- links
+https://m.stock.naver.com/pdf?url=https%3A%2F%2Fstock.pstatic.net%2Fstock-research%2Fcompany%2F74%2F20260325_company_56899000.pdf
+https://m.stock.naver.com/domestic/stock/085910/research/91065?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/77077?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/55687?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/52091?domesticStockExchange=KRX
+https://m.stock.naver.com/domestic/stock/085910/research/14763?domesticStockExchange=KRX
