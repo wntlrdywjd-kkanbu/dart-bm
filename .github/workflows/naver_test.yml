@@ -9,37 +9,38 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-      - name: 네이버 리서치 접근 테스트 2
+      - name: 네이버 리서치 접근 테스트 3
         run: |
           mkdir -p out
-          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
           t() { echo "### $1"; curl -s -L -m 25 -A "$UA" -o /tmp/o.txt -w "http=%{http_code} size=%{size_download} url=%{url_effective} ct=%{content_type}\n" "$1"; head -c ${2:-500} /tmp/o.txt; echo; }
           {
+            t "https://m.stock.naver.com/domestic/stock/085910/research/91065?domesticStockExchange=KRX" 300
+            echo "-- hints"; grep -o 'front-api/[a-zA-Z0-9/_?=&-]*' /tmp/o.txt | sort -u | head
+            grep -o '"[a-zA-Z]*[pP]df[a-zA-Z]*":"[^"]*"' /tmp/o.txt | head -5
+            grep -o 'https\?://[^"\\ ]*\.pdf[^"\\ ]*' /tmp/o.txt | head -3
+            grep -o '"researchId[^}]\{0,300\}' /tmp/o.txt | head -3
+            grep -o 'data-n-head\|__NEXT_DATA__\|__NUXT__\|self.__next_f' /tmp/o.txt | sort -u | head
+            cp /tmp/o.txt out/_naver_page.html
+            t "https://m.stock.naver.com/domestic/stock/085910/research" 200
+            grep -o 'front-api/[a-zA-Z0-9/_?=&-]*' /tmp/o.txt | sort -u | head
             B="https://m.stock.naver.com/front-api/research"
-            t "$B/list?category=company&itemCode=003160&page=1&pageSize=3" 300
-            t "$B/list?category=company&stockCode=003160&page=1&pageSize=3" 300
-            t "$B/list?category=company&code=003160&page=1&pageSize=3" 300
-            t "$B/list?category=company&keyword=%EB%94%94%EC%95%84%EC%9D%B4&page=1&pageSize=3" 300
-            t "$B/list?category=company&searchType=itemCode&itemCode=003160&page=1&pageSize=3" 300
-            t "https://m.stock.naver.com/front-api/research/item/003160?page=1&pageSize=3" 300
-            t "https://m.stock.naver.com/front-api/research/stock/003160?page=1&pageSize=3" 300
-            t "https://m.stock.naver.com/api/research/company?itemCode=003160&page=1&pageSize=3" 300
-            t "https://m.stock.naver.com/front-api/research/company/96804" 1500
-            t "$B/detail?category=company&researchId=96804" 1500
-            t "$B/read?category=company&researchId=96804" 1500
-            t "https://m.stock.naver.com/research/company/96804" 200
-            echo "-- html hints"; grep -o 'https\?://[^"\\ ]*\.pdf[^"\\ ]*' /tmp/o.txt | head -3; grep -o '"[a-zA-Z]*[pP]df[a-zA-Z]*":"[^"]*"' /tmp/o.txt | head -5; grep -o '"pdfUrl[^,]*' /tmp/o.txt | head
-            t "https://stock.naver.com/domestic/stock/003160/research" 200
-            grep -o '"[a-zA-Z]*[pP]df[a-zA-Z]*":"[^"]*"' /tmp/o.txt | head -3
-            t "https://m.stock.naver.com/domestic/stock/003160/research" 200
-            grep -o '"[a-zA-Z]*[pP]df[a-zA-Z]*":"[^"]*"' /tmp/o.txt | head -3
-            grep -o 'front-api/[a-zA-Z/_-]*' /tmp/o.txt | sort -u | head
+            t "$B/company/91065" 1500
+            t "$B/detail/91065" 1000
+            t "$B/company/91065?domesticStockExchange=KRX" 1000
+            t "$B/read?researchId=91065&category=company" 1000
+            t "$B/list?category=company&itemCode=085910&domesticStockExchange=KRX&page=1&pageSize=3" 400
+            t "$B/stock/085910?category=company&page=1&pageSize=3" 400
+            t "$B/list/085910?category=company&page=1&pageSize=3" 400
+            t "$B/list?category=company&reutersCode=085910&page=1&pageSize=3" 400
+            t "https://m.stock.naver.com/front-api/domestic/stock/085910/research?page=1&pageSize=3" 400
+            t "https://m.stock.naver.com/api/domestic/stock/085910/research?page=1&pageSize=3" 400
           } > out/_naver_test.txt 2>&1
       - name: 커밋
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add out/_naver_test.txt
-          git diff --cached --quiet || git commit -m "naver test 2"
+          git add out/_naver_test.txt out/_naver_page.html
+          git diff --cached --quiet || git commit -m "naver test 3"
           git push
