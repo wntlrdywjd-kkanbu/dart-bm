@@ -6,19 +6,32 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: pip install playwright && playwright install --with-deps chromium
-      - run: mkdir -p out && python tools/naver_probe.py
+      - name: PDF·상세 테스트
+        run: |
+          mkdir -p out /tmp/r
+          UA="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+          {
+            echo "## stockEnd 96804 (broker report)"
+            curl -s -m 25 -A "$UA" "https://m.stock.naver.com/front-api/research/stockEnd?itemCode=034020&researchId=96804" | python3 -c "import sys,json;d=json.load(sys.stdin)['result'];print(list(d.keys()));print(json.dumps(d['researchContent'],ensure_ascii=False)[:1500]);print(json.dumps(d.get('researchSummaries'),ensure_ascii=False)[:600])"
+            sleep $((RANDOM % 4 + 2))
+            echo "## stockList 003160"
+            curl -s -m 25 -A "$UA" "https://m.stock.naver.com/front-api/research/stockList?itemCode=003160&pageSize=5&page=1" | head -c 900
+            echo
+            URL=$(curl -s -m 25 -A "$UA" "https://m.stock.naver.com/front-api/research/stockEnd?itemCode=034020&researchId=96804" | python3 -c "import sys,json;print(json.load(sys.stdin)['result']['researchContent']['attachUrl'])")
+            echo "## pdf $URL"
+            sleep $((RANDOM % 4 + 2))
+            curl -s -m 40 -A "$UA" -o /tmp/r/a.pdf -w "http=%{http_code} size=%{size_download} ct=%{content_type}\n" "$URL"
+            sudo apt-get install -y -qq poppler-utils >/dev/null 2>&1
+            pdftotext -layout /tmp/r/a.pdf /tmp/r/a.txt && wc -c /tmp/r/a.txt && head -c 1200 /tmp/r/a.txt
+          } > out/_naver_pdf.txt 2>&1
       - name: 커밋
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add out/_naver_net.txt
-          git diff --cached --quiet || git commit -m "naver probe"
+          git add out/_naver_pdf.txt
+          git diff --cached --quiet || git commit -m "naver pdf test"
           git push
