@@ -17,7 +17,14 @@ jobs:
             echo "== list 003160"
             curl -s -L -m 30 -A "$UA" -e "https://finance.naver.com/research/" -o /tmp/l.html -w "http=%{http_code} size=%{size_download} url=%{url_effective}\n" "https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemName=%EB%94%94%EC%95%84%EC%9D%B4&itemCode=003160"
             iconv -f euc-kr -t utf-8 /tmp/l.html 2>/dev/null | sed 's/<[^>]*>/ /g' | tr -s ' \n' | head -c 3000
-            echo; echo "== pdf link sample"
+            echo; echo "== api hints"
+            grep -o 'https\?://[a-zA-Z0-9./_?=&%-]*api[a-zA-Z0-9./_?=&%-]*' /tmp/l.html | sort -u | head -20
+            grep -o '"[a-zA-Z/]*research[a-zA-Z/_-]*"' /tmp/l.html | sort -u | head -20
+            grep -o '__NEXT_DATA__' /tmp/l.html | head -1
+            grep -o '<script[^>]*src="[^"]*"' /tmp/l.html | head -10
+            echo "== try api"
+            for u in "https://m.stock.naver.com/front-api/research/list?category=company&itemCode=003160&page=1&pageSize=5" "https://api.stock.naver.com/research/company?itemCode=003160&page=1&pageSize=5"; do echo "$u"; curl -s -m 20 -A "$UA" -w "\nhttp=%{http_code}\n" "$u" | head -c 800; echo; done
+            echo "== pdf link sample"
             grep -o 'href="[^"]*\.pdf"' /tmp/l.html | head -3
             echo "== company_read"
             grep -o 'company_read.naver?nid=[0-9]*[^"]*' /tmp/l.html | head -2
