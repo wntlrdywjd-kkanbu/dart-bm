@@ -400,7 +400,7 @@ def _unit(caption):
     return UNIT_MULT.get(m.group(1)) if m else None
 
 
-def seg_from_lines(lines):
+def _seg_main(lines):
     """'주요 제품 등의 현황' 표(매출액·비율 열)에서 사업부문별 매출을 원 단위로 추출. 합계 검증 실패 시 None."""
     for i, ln in enumerate(lines):
         if not ln.startswith("|") or "매출액" not in ln or not re.search(r"비율|구성비|비중", ln):
@@ -457,6 +457,49 @@ def seg_from_lines(lines):
     return None
 
 
+def seg_from_lines(lines):
+    r = _seg_main(lines)
+    return r or _seg_product(lines)
+
+
+def _seg_product(lines):
+    """단일 사업부문 회사: '(1) 주요 제품군별 매출실적' 표(구분 | 당기 | 전기 ... | 합계) 의 당기 열."""
+    blocks = split_blocks(lines)
+    ctx = ""
+    for b in blocks:
+        if b["type"] == "text":
+            ctx = b["text"]
+            continue
+        rows = b["rows"]
+        if len(rows) == 1 and "단위" in rows[0]:
+            ctx = ctx + " " + rows[0]
+            continue
+        if "제품군" not in ctx.replace(" ", "") and "제품군" not in (b.get("caption") or ""):
+            ctx = ""
+            continue
+        mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", ctx + " " + (b.get("caption") or ""))
+        ctx = ""
+        if not mu or len(rows) < 3:
+            continue
+        mult = {"백만원": 1e6, "천원": 1e3, "원": 1.0}[mu.group(1)]
+        items, total = {}, None
+        for r in rows[1:]:
+            c = [x.strip() for x in r.strip().strip("|").split("|")]
+            if len(c) < 2:
+                continue
+            v = _num(c[1])
+            nm = c[0].replace(" ", "")
+            if v is None:
+                continue
+            if nm in ("합계", "계", "총계"):
+                total = v
+            else:
+                items[c[0].strip()] = v
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k: v * mult for k, v in items.items()}
+    return None
+
+
 def collect_segments(reps, maxn=20):
     out = []
     for r in reps[:maxn]:
@@ -486,6 +529,19 @@ def _cellnums(row):
     return out
 
 
+def rows_one_ok(b):
+    return True
+
+
+def _single_total(b, head):
+    """합계 행 없이 한 행짜리(연결 전체) 수주상황 표: 마지막 3개 숫자를 수주총액·기납품액·수주잔고로."""
+    for r in b["rows"][2:]:
+        nums = [v for v in _cellnums(r) if v is not None]
+        if len(nums) >= 3:
+            return nums[-3:]
+    return None
+
+
 def order_series(biz):
     """수주상황 표 1개에서 합계(수주총액·기납품액·수주잔고)와 품목별 잔고를 읽는다. 실패하면 None."""
     if not biz:
@@ -511,7 +567,7 @@ def order_series(biz):
             name = re.sub(r"\s+", "", r.strip().strip("|").split("|")[0])
             nums = _cellnums(r)
             vals = [v for v in nums if v is not None]
-            if len(nums) >= 6 and len(vals) >= 3:
+            if len(nums) >= 6 and len(vals) >= 3 and "수량" in head:
                 amt = [nums[1], nums[3], nums[5]]
             elif len(nums) >= 3:
                 amt = nums[-3:]
@@ -521,6 +577,9 @@ def order_series(biz):
                 tot = amt
             elif name:
                 items[name] = amt[2]
+        if not tot and len(items) == 1 and rows_one_ok(b):
+            tot = [None, None, list(items.values())[0]]
+            tot = _single_total(b, head)
         if tot and tot[2] is not None:
             return {"unit": unit, "total": tot[0], "deliv": tot[1], "backlog": tot[2], "items": items}
     return None
@@ -562,7 +621,7 @@ def capa_from_lines(lines):
         if b["type"] != "table" or len(b["rows"]) < 2:
             continue
         hc = [re.sub(r"\s+", "", x) for x in b["rows"][0].strip().strip("|").split("|")]
-        if len(hc) >= 4 and hc[-1] in ("가동률", "가동율") and re.search(r"가능|생산능력|CAPA", "".join(hc[-3:-1]), re.I) and re.search(r"실제|생산실적", "".join(hc[-3:-1])):
+        if len(hc) >= 4 and hc[-1] in ("가동률", "가동율", "평균가동률", "평균가동율") and re.search(r"가능|생산능력|CAPA", "".join(hc[-3:-1]), re.I) and re.search(r"실제|생산실적", "".join(hc[-3:-1])):
             for r in b["rows"][1:]:
                 cells = [x.strip() for x in r.strip().strip("|").split("|")]
                 if len(cells) < 4:
@@ -799,7 +858,58 @@ def region_from_lines(lines):
         pick = tot.get("총계") or tot.get("전체") or tot.get("총합계") or tot.get("합계")
         if pick and "dom" in pick and "exp" in pick:
             dom, exp, found = pick["dom"], pick["exp"], 2
-    return {"dom": dom, "exp": exp} if found >= 2 and (dom + exp) > 0 else None
+    if found >= 2 and (dom + exp) > 0:
+        return {"dom": dom, "exp": exp}
+    return _region_simple(blocks)
+
+
+def _region_simple(blocks):
+    """'| 사업부문 | 매출유형 | 품목 | 수 출 | 금액 | ...' 처럼 수출/국내 라벨이 앞 4칸 중 하나인 단일 사업부문 표. 첫 표의 당기(첫 숫자열)."""
+    prev_text = ""
+    for b in blocks:
+        if b["type"] == "text":
+            prev_text = b["text"]
+            continue
+        rows = b["rows"]
+        if len(rows) == 1 and "단위" in rows[0]:
+            prev_text = rows[0]
+            continue
+        head = " ".join(rows[:1])
+        if not re.search(r"제\s*\d+\s*기|당기|반기|분기", head):
+            continue
+        ctx = (b.get("caption") or "") + " " + prev_text
+        mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", ctx)
+        if not mu:
+            continue
+        mult = {"백만원": 1e6, "천원": 1e3, "원": 1.0}[mu.group(1)]
+        dom = exp = 0.0
+        hit = 0
+        for r in rows[1:]:
+            cells = [x.strip() for x in r.strip().strip("|").split("|")]
+            lab = None
+            for i, c in enumerate(cells[:4]):
+                c2 = re.sub(r"\s+", "", c)
+                if c2 in ("내수", "국내", "수출", "해외"):
+                    lab, k = ("dom" if c2 in ("내수", "국내") else "exp"), i
+                    break
+            if not lab:
+                continue
+            v = None
+            for c in cells[k + 1:]:
+                c2 = c.replace(",", "").strip()
+                if re.fullmatch(r"-?\d+(\.\d+)?", c2):
+                    v = float(c2)
+                    break
+            if v is None:
+                continue
+            hit += 1
+            if lab == "dom":
+                dom += v * mult
+            else:
+                exp += v * mult
+        if hit >= 2 and dom > 0 and exp > 0:
+            return {"dom": dom, "exp": exp}
+    return None
 
 
 def collect_region(reps, maxn=20):
