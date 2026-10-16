@@ -15,7 +15,7 @@ jobs:
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
           {
             echo "== list 003160"
-            curl -s -m 30 -A "$UA" -o /tmp/l.html -w "http=%{http_code} size=%{size_download}\n" "https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemName=%EB%94%94%EC%95%84%EC%9D%B4&itemCode=003160"
+            curl -s -L -m 30 -A "$UA" -e "https://finance.naver.com/research/" -o /tmp/l.html -w "http=%{http_code} size=%{size_download} url=%{url_effective}\n" "https://finance.naver.com/research/company_list.naver?searchType=itemCode&itemName=%EB%94%94%EC%95%84%EC%9D%B4&itemCode=003160"
             iconv -f euc-kr -t utf-8 /tmp/l.html 2>/dev/null | sed 's/<[^>]*>/ /g' | tr -s ' \n' | head -c 3000
             echo; echo "== pdf link sample"
             grep -o 'href="[^"]*\.pdf"' /tmp/l.html | head -3
