@@ -403,30 +403,54 @@ def _unit(caption):
 def seg_from_lines(lines):
     """'주요 제품 등의 현황' 표(매출액·비율 열)에서 사업부문별 매출을 원 단위로 추출. 합계 검증 실패 시 None."""
     for i, ln in enumerate(lines):
-        if not ln.startswith("|") or "매출액" not in ln or "비율" not in ln:
+        if not ln.startswith("|") or "매출액" not in ln or not re.search(r"비율|구성비|비중", ln):
             continue
         hdr = [c.strip() for c in ln.strip().strip("|").split("|")]
-        if len(hdr) < 3 or hdr[-1] != "비율":
+        if len(hdr) < 3 or hdr[-1] not in ("비율", "구성비", "비중"):
             continue
         cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if lines[k].strip() and not lines[k].startswith("|")), "")
         mult = _unit(cap)
+        if not mult:  # '| (단위 : 백만원) |' 처럼 표 형태로 단위만 적은 줄
+            cap2 = next((lines[k] for k in range(i - 1, max(i - 4, -1), -1) if "단위" in lines[k]), "")
+            mult = _unit(cap2)
         if not mult:
             continue
         items, total, name, k = {}, None, None, i + 1
+        subs, has_sub = {}, False
         while k < len(lines) and lines[k].startswith("|"):
             c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
             k += 1
             if len(c) < 2:
                 continue
             amt = _num(c[-2])
-            if c[0].replace(" ", "") in ("합계", "계", "총계"):
+            c0 = c[0].replace(" ", "")
+            if c0 in ("합계", "계", "총계"):
                 total = amt
+                continue
+            if c0 == "소계":  # 부문 소계 행: 직전 부문의 합
+                if name is not None and amt is not None:
+                    subs[name] = amt
+                    has_sub = True
+                continue
+            if len(c) >= 4 and "소계" in c[1].replace(" ", "") and c[0]:  # '| 음향·영상기기 | 제품 및 상품 등 소 계 | 금액 | 비율 |'
+                name = c[0]
+                if amt is not None:
+                    subs[name] = amt
+                    has_sub = True
+                continue
+            if c0.startswith("내부거래") or c0.startswith("연결조정"):
+                if amt is not None:
+                    subs[c[0]] = amt
+                    has_sub = True
                 continue
             if len(c) == len(hdr) and c[0]:
                 name = c[0]
             if amt is None or name is None:
                 continue
             items[name] = items.get(name, 0) + amt
+        if has_sub:
+            for kk, vv in subs.items():
+                items[kk] = vv
         if items and total and abs(sum(items.values()) - total) <= total * 0.03:
             return {k2: v * mult for k2, v in items.items()}
         return None
@@ -533,9 +557,31 @@ def capa_from_lines(lines):
     표 형태: '| 부문 | 생산능력 | 당기 | 전기 | 전전기 |' 뒤에 '| 생산실적 | ... |' 가 이어지는 구조(부문 셀은 rowspan 이라 생략되기도 함)."""
     groups, cur, unit = {}, None, ""
     blocks = split_blocks(lines)
+    # 형식 2: '| 사업부문 | 품목 | 가동 가능 | 실제 가동 | 가동률 |' (품목별 한 행)
+    for b in blocks:
+        if b["type"] != "table" or len(b["rows"]) < 2:
+            continue
+        hc = [re.sub(r"\s+", "", x) for x in b["rows"][0].strip().strip("|").split("|")]
+        if len(hc) >= 4 and hc[-1] in ("가동률", "가동율") and re.search(r"가능|생산능력|CAPA", "".join(hc[-3:-1]), re.I) and re.search(r"실제|생산실적", "".join(hc[-3:-1])):
+            for r in b["rows"][1:]:
+                cells = [x.strip() for x in r.strip().strip("|").split("|")]
+                if len(cells) < 4:
+                    continue
+                nums = []
+                for c in cells[-3:]:
+                    m2 = re.match(r"^-?[\d,]+(\.\d+)?", c.replace(" ", ""))
+                    nums.append(float(m2.group(0).replace(",", "")) if m2 else None)
+                if None in nums:
+                    continue
+                nm = re.sub(r"\(.*", "", re.sub(r"\s+", "", cells[-4]))
+                if nm:
+                    groups[nm] = {"unit": "", "capa": nums[0], "prod": nums[1], "util": nums[2]}
+    if groups:
+        return groups
     for b in blocks:
         if b["type"] != "table":
             continue
+
         head = (b.get("caption") or "") + " " + " ".join(b["rows"][:1])
         if not any(k in " ".join(b["rows"]).replace(" ", "") for k in ("가동률", "가동율")):
             continue
@@ -704,8 +750,12 @@ def region_from_lines(lines):
             prev_text = b["text"]
             continue
         rows = b["rows"]
+        if len(rows) == 1 and "단위" in rows[0]:  # '| (단위 : 백만원) |' 한 줄 표
+            prev_text = rows[0]
+            continue
         blob = " ".join(rows)
-        if not ("내수" in blob and "수출" in blob and ("합계" in blob or "합 계" in blob)):
+        bs_ = re.sub(r"\s+", "", blob)
+        if not ("내수" in bs_ and "수출" in bs_ and ("합계" in bs_ or "총계" in bs_)):
             continue
         head = " ".join(rows[:2])
         if not re.search(r"제\s*\d+\s*기|당기|반기|분기", head):
@@ -770,8 +820,10 @@ def collect_insider(corp_code, d):
     """임원·주요주주 특정증권 소유상황 보고 목록(증감 주식 수). 가격·보고사유는 원문에만 있어 최근 3건 원문을 insider_docs/ 에 저장(양식 확인용)."""
     try:
         j = get_json("elestock.json", corp_code=corp_code)
-    except RuntimeError:
+    except RuntimeError as e:
+        print(f"[경고] elestock 호출 실패: {e}", file=sys.stderr)
         return []
+    print(f"elestock status={j.get('status')} msg={j.get('message')} rows={len(j.get('list') or [])}")
     rows = []
     for r in j.get("list") or []:
         rows.append({"dt": r.get("rcept_dt"), "no": r.get("rcept_no"), "who": (r.get("repror") or "").strip(),

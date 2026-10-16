@@ -32,7 +32,8 @@ def parse_table(t):
         vals = [_n(c) for c in cells[1:]]
         if not name or vals[0] is None or name in ("구분", "구 분"):
             continue
-        is_tot = re.sub(r"\s", "", name).startswith(("합계", "계"))
+        nn = re.sub(r"\s", "", name)
+        is_tot = nn.startswith(("합계", "계")) or nn.endswith("합계")
         if quarterly:
             if len(vals) < 2 or vals[1] is None:
                 continue
@@ -82,6 +83,10 @@ def quarters(rep):
                 res[k] = {n: r["cum"].get(n, 0.0) - prev["cum"].get(n, 0.0) for n in names}
         elif r["quarterly"]:
             res[k] = dict(r["q"])
+            if m == 6 and f"{y}.03" not in rep:  # 1Q 보고서에 주석이 없으면 반기 누적 − 2Q(3개월)
+                res[f"{y}.03"] = {n: r["cum"].get(n, 0.0) - r["q"].get(n, 0.0) for n in set(r["cum"]) | set(r["q"])}
+        elif m == 3:
+            res[k] = dict(r["cum"])  # 1Q 는 3개월=누적(단일 열 표)
     return res
 
 

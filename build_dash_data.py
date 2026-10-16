@@ -79,7 +79,7 @@ def extra(base, meta, fin):
     ex["cf"] = cfd
     if fin.get("dividend"):
         ex["div"] = fin["dividend"]
-    segs = fin.get("segments") or []
+    segs = [{**s_, "items": {n: v for n, v in s_["items"].items() if v is not None and v >= 0}} for s_ in (fin.get("segments") or [])]  # 내부거래(-) 제외
     if segs:
         names = {}
         for s_ in segs:
