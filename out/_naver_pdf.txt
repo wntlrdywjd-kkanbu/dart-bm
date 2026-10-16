@@ -1,0 +1,28 @@
+## stockEnd 96804 (broker report)
+['researchContent', 'researchSummaries']
+{"itemCode": "034020", "itemName": "두산에너빌리티", "researchId": 96804, "title": "연내 SMR 추가 수주 기대", "brokerName": "하나증권", "writeDate": "2026-10-16", "readCount": "3227", "attachUrl": "https://stock.pstatic.net/stock-research/company/57/20261016_company_624558000.pdf", "content": "<p><strong>목표주가 120,000원으로 하향, 투자의견 매수 유지</strong></p><p><br>두산에너빌리티 목표주가 120,000원으로 27.3% 하향하며 투자의견 매수 유지한다. 2030년 최대 Capa 기준 Noplat은 유지하나 배수를 기존 50배에서 35배로 하향했다. 3분기 실적은 시장 기대치를 하회할 전망이다. 다만 기존 시장 눈높이가 높았던 영향이며 전사적인 증익 기조는 여전히 유지될 수 있다. 자회사 가운데 연료전지 감익은 건설기계가 만회할 수 있고 에너빌리티 부문도 기존 수주잔고를 바탕으로 안정적인 실적 성장이 기대된다. 2026년 예상 실적 기준 PER 119.9배, PBR 5.2배다.</p>", "opinion": "Buy", "goalPrice": "120000", "prevGoalPrice": "63300", "priceAtWriteDate": "63300"}
+[{"researchCategory": "종목분석", "category": "종목분석", "itemCode": "034020", "itemName": "두산에너빌리티", "researchId": 96804, "title": "연내 SMR 추가 수주 기대", "brokerName": "하나증권", "writeDate": "2026-10-16", "readCount": "3227", "previewContent": "목표주가 120,000원으로 하향, 투자의견 매수 유지두산에너빌리티 목표주가 120,000원으로 27.3% 하향하며 투자의견 매수 유지한다. 2030년 최대 Capa 기준 Nopl"}, {"researchCategory": "종목분석", "category": "종목분석", "itemCode": "034020", "itemName": "두산에너빌리티", "researchId": 96759, "title": "전력 수요 증가에 최적화된 사업 포트폴리오", "brokerName": "삼성증권", "writeDate": "2026-10-15", "readCount": "6236", "previewContent": "WHAT’S THE STORY?원전 확대 
+## stockList 003160
+{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"003160","itemName":"디아이","researchId":96657,"title":"이제 시작","brokerName":"대신증권","writeDate":"2026-10-13","readCount":"4420","previewContent":"투자의견 Buy 유지, 목표주가 60,000원으로 상향 (기존 대비 +54%)투자의견 Buy를 유지하며 목표주가를 60,000원으로 기존 대비 54% 상향. 목표주가 상향의 근거는"},{"researchCategory":"종목분석","category":"종목분석","itemCode":"003160","itemName":"디아이","researchId":96018,"title":"전방산업 투자 확대 ⇒ 올해 사상 최대 실적","brokerName":"iM증권","writeDate":"2026-09-07","readCount":"15431","previewContent":"올해 2분기 메모리 패키지 테스터 및 HBM4 웨이퍼 테스터 매출 본격화되면서 역대 최대 분기
+## pdf https://stock.pstatic.net/stock-research/company/57/20261016_company_624558000.pdf
+http=200 size=509470 ct=application/octet-stream
+27324 /tmp/r/a.txt
+                                                                        2026년 10월 16일 I 기업분석_Earnings Preview
+
+
+
+
+        BUY (유지)                                                        두산에너빌리티 (034020)
+목표주가(12M) 120,000원(하향)                                                  연내 SMR 추가 수주 기대
+현재주가(10.15)                                    63,300원
+
+
+
+Key Data
+KOSPI 지수 (pt)                                             5,554.22
+                                                                        목표주가 120,000원으로 하향, 투자의견 매수 유지
+52주 최고/최저(원)                                  136,400/60,200
+시가총액(십억원)                                                 40,547.5      두산에너빌리티 목표주가 120,000원으로 27.3% 하향하며 투자의견 매수 유지한다. 2030년
+시가총액비중(%)                                                        0.89
+발행주식수(천주)                                                640,561.1
+                                                                        최대 Capa 기준 Noplat은 유지하나 배수를 기
