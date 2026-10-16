@@ -96,6 +96,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
   .tag { font-size: 11.5px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); } .tag.pos { color: var(--s3); } .tag.mid { color: var(--s1); }
   .rmeta { font-size: 12.5px; color: var(--muted); margin: 8px 0 4px; } .rvs { margin: 6px 0; max-width: 110ch; } ul.rpts { margin: 6px 0; padding-left: 18px; max-width: 110ch; line-height: 1.7; } ul.rpts li { margin: 5px 0; }
   table.est td { padding: 4px 9px; } .watch { margin: 8px 0 2px; padding: 8px 10px; border-left: 3px solid var(--s1); background: var(--bg); max-width: 110ch; line-height: 1.65; font-size: 13px; }
+  #pick { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; max-width: 100%; }
 </style>
 
 <div class="wrap" id="app">
@@ -105,6 +106,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       <div class="sub" id="sub">불러오는 중</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select id="pick" hidden aria-label="종목 선택"></select>
       <a href="index.html" class="btn" style="align-self:center">목록</a><button id="btn-gpt" hidden>GPT용 복사</button><button id="btn-save" hidden>HTML로 저장</button>
     </div>
   </header>
