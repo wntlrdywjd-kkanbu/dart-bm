@@ -1163,6 +1163,26 @@ def fetch_doc(rcept_no):
     return decode(z.read(best))
 
 
+def dump_latest(rcept_no, path):
+    """최신 보고서 ZIP 구성과 '부문·성격별·영업수익' 주변 원문을 out/{code}/notes_raw.txt 로 저장(파서 점검용)."""
+    r = get("document.xml", rcept_no=rcept_no)
+    z = zipfile.ZipFile(io.BytesIO(r.content))
+    out = ["ZIP: " + ", ".join(f"{n}({z.getinfo(n).file_size})" for n in z.namelist())]
+    keys = ("영업부문", "부문별", "성격별", "비용의 성격", "영업수익", "영업비용", "신탁보수", "금융업")
+    for n in z.namelist():
+        if not n.lower().endswith((".xml", ".html", ".htm")):
+            continue
+        lines = to_text(decode(z.read(n)))
+        out.append(f"=== {n} lines={len(lines)}")
+        last = -99
+        for i, l in enumerate(lines):
+            if any(k in l for k in keys) and i - last > 6:
+                out.append(f"--- {i}")
+                out.extend(x[:300] for x in lines[i:i + 14])
+                last = i
+    open(path, "w", encoding="utf-8").write("\n".join(out)[:150000])
+
+
 def table_to_md(table):
     rows = []
     for tr in table.find_all("tr"):
@@ -1664,6 +1684,10 @@ def main():
         print(f"가동률 {len(fin['capa_hist'])}개 보고서")
     except Exception as e:
         print(f"[경고] 가동률 수집 실패: {e}", file=sys.stderr)
+    try:
+        dump_latest(latest["rcept_no"], os.path.join(d, "notes_raw.txt"))
+    except Exception as e:
+        print(f"[경고] 주석 원문 덤프 실패: {e}", file=sys.stderr)
     try:
         fin["cost_files"] = collect_cost_raw(reps)
         print(f"비용 주석 원문 {len(fin['cost_files'])}개 보고서")
