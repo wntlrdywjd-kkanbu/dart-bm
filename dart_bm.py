@@ -933,6 +933,7 @@ def _region_simple(blocks):
         mult = {"백만원": 1e6, "천원": 1e3, "원": 1.0}[mu.group(1)]
         dom = exp = 0.0
         hit = 0
+        in_tot, tot_row = False, None
         for r in rows[1:]:
             cells = [x.strip() for x in r.strip().strip("|").split("|")]
             lab = None
@@ -951,11 +952,21 @@ def _region_simple(blocks):
                     break
             if v is None:
                 continue
+            if k == 1 and re.sub(r"\s+", "", cells[0]) == "합계":  # 제품별 행 뒤의 '합계' 묶음 시작(수출 행). 이후 내수 행은 첫 칸에 라벨만 있음
+                in_tot = True
+                tot_row = (tot_row or {})
+                tot_row[lab] = tot_row.get(lab, 0.0) + v * mult
+                continue
+            if in_tot and k == 0:
+                tot_row[lab] = tot_row.get(lab, 0.0) + v * mult
+                continue
             hit += 1
             if lab == "dom":
                 dom += v * mult
             else:
                 exp += v * mult
+        if tot_row and tot_row.get("dom") and tot_row.get("exp"):
+            return {"dom": tot_row["dom"], "exp": tot_row["exp"]}
         if hit >= 2 and dom > 0 and exp > 0:
             return {"dom": dom, "exp": exp}
     return None
