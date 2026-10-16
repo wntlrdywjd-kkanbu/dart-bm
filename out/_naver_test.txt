@@ -1,5 +1,31 @@
 == list 003160
 http=200 size=126547 url=https://stock.naver.com/research/company
  Npay 利沅 <meta name="description" content="愿
+== api hints
+"/research"
+"/research/company"
+"/research/daily"
+"/research/debenture"
+"/research/economy"
+"/research/industry"
+"/research/invest"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/709a4a77-72e50ae442961c14.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/95412-3ca938aef9f68545.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/main-app-4b7e1d1ee116a80c.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/8201-3530517b90e4249f.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/21263-c46a2358f8a064a6.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/app/global-error-263367516e8b05af.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/eef9e134-59339399dbb77abe.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/79112-2197b6fa893d8d0b.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/70949-dbc9eb3ec5aa2002.js"
+<script src="https://ssl.pstatic.net/imgstock/fn/real/pc/_next/static/chunks/50500-55f64d04aafd6f49.js"
+grep: write error: Broken pipe
+== try api
+https://m.stock.naver.com/front-api/research/list?category=company&itemCode=003160&page=1&pageSize=5
+{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"3086","endUrl":"https://m.stock.naver.com/research/company/96804"},{"researchCategory":"종목분석","category":"종목분석","itemCode":"003490","itemName":"대한항공","researchId":96803,"title":"[3Q26 Review] 2Q 성과급 미반영분 반영","brokerName":"한화투자증권","writeDate":"2026-10-16","readCount":"2277","endUrl":"https://m.stock.naver.com/research/company/96803"},{"researchCategory":"종목분석","category":"종목분석","itemCode":"021240","itemName":"코웨이","resear
+https://api.stock.naver.com/research/company?itemCode=003160&page=1&pageSize=5
+{"timestamp":"2026-10-16T07:33:11.332+0000","status":404,"error":"Not Found","message":"No message available","path":"/research/company"}
+http=404
+
 == pdf link sample
 == company_read
