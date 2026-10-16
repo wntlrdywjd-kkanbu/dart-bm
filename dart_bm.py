@@ -927,6 +927,8 @@ def _region_simple(blocks):
         if not re.search(r"제\s*\d+\s*기|당기|반기|분기", head):
             continue
         ctx = (b.get("caption") or "") + " " + prev_text
+        if "가격" in ctx or re.search(r"단위\s*[:：]?\s*원\s*/", ctx):  # 가격변동추이 표(원/Km 등)는 매출 표가 아님
+            continue
         mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", ctx)
         if not mu:
             continue
