@@ -146,8 +146,8 @@ def extra(base, meta, fin):
         units = [o["unit"] for o in oh if o.get("unit")]
         un = max(set(units), key=units.count) if units else ""
         mm = re.search(r"([\d,]+)", un)
-        us = "US" in un
-        mult = float(mm.group(1).replace(",", "")) if mm else (1e8 if "억" in un else 1e6 if "백만" in un else 1e3 if "천" in un else 1.0)
+        us = "US" in un or "$" in un
+        mult = 1e3 if "K$" in un.replace(" ", "") else float(mm.group(1).replace(",", "")) if mm else (1e8 if "억" in un else 1e6 if "백만" in un else 1e3 if "천" in un else 1.0)
         div = 1e6 if us else 1e8
         uname = "US$ 백만" if us else "억원"
         qkeys = sorted({f"{o['key'][:4]}.{int(o['key'][5:]):02d}" for o in oh})
@@ -167,7 +167,7 @@ def extra(base, meta, fin):
                 q = None
                 if o and o.get("deliv") is not None:
                     pk_ = by.get(f"{y}.{m-3:02d}") if m > 3 else None
-                    q = (o["deliv"] - (pk_["deliv"] if pk_ else 0)) * mult / div if (m == 3 or pk_) else None
+                    q = (o["deliv"] - (pk_["deliv"] if pk_ else 0)) * mult / div if (m == 3 or (pk_ and pk_.get("deliv") is not None)) else None
                 if q is not None and q < 0:
                     q = None  # 집계 기간이 달라 누적이 역전된 보고서
                 n_ = (q + b - prevb) if (q is not None and b is not None and prevb is not None) else None
@@ -177,6 +177,11 @@ def extra(base, meta, fin):
                 prevb = b
         ex["ord"] = {"unit": uname, "labels": labels, "backlog": bl, "deliv": dl, "new": nw,
                      "items": {k: v for k, v in (oh[-1].get("items") or {}).items() if v}, "latest": oh[-1]["key"]}
+        try:
+            if (json.load(open(os.path.join(base, "notes.json"), encoding="utf-8")) or {}).get("orders_no_new"):
+                ex["ord"].update({"deliv": [None] * len(labels), "new": [None] * len(labels), "items": {}})  # 계약 목록형 표: 누적 납품 차이로 신규수주를 추정할 수 없음
+        except (OSError, ValueError, AttributeError):
+            pass
     ch = fin.get("capa_hist") or []
     if len(ch) >= 3:
         try:

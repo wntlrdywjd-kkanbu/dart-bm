@@ -564,26 +564,50 @@ def order_series(biz):
         m = re.search(r"단위\s*[:：]?\s*([^)\s]*[^)]*)", unit)
         unit = (m.group(1).strip() if m else unit).strip(" )")
         tot = None
+        tots = {}
+        krw = None
+        usd_rows = []
+        last_cur = ""
         items = {}
+        contract_list = "통화" in head.replace(" ", "")  # 계약별 나열 표(통화 열): 합계가 통화별로 따로 있음
         for r in b["rows"][2:]:
             name = re.sub(r"\s+", "", r.strip().strip("|").split("|")[0])
             nums = _cellnums(r)
             vals = [v for v in nums if v is not None]
-            if len(nums) >= 6 and len(vals) >= 3 and "수량" in head:
-                amt = [nums[1], nums[3], nums[5]]
-            elif len(nums) >= 3:
+            if len(vals) >= 6 and "수량" in head:
+                amt = [nums[1], nums[3], nums[5]] if len(nums) == 6 else [vals[-5], vals[-3], vals[-1]]
+            elif len(nums) >= 3 and len(vals) >= 2:
                 amt = nums[-3:]
             else:
                 continue
-            if name in ("합계", "계", "총계", "소계"):
+            if contract_list and not re.match(r"^(합계|계|총계|소계)", name):
+                last_cur = "USD" if "USD" in r.upper() else "KRW" if "KRW" in r.upper() else last_cur
+                if "USD" in r.upper() and amt[2] is not None:
+                    usd_rows.append(amt)
+            if re.match(r"^(합계|계|총계|소계)(\(|$)", name):
+                cur = "USD" if "USD" in r.upper() else "KRW" if "KRW" in r.upper() else last_cur
+                if not cur:
+                    m_ = re.search(r"\((USD|KRW)\)", name.upper())
+                    cur = m_.group(1) if m_ else ""
+                tots[cur] = amt
                 tot = amt
             elif name:
                 items[name] = amt[2]
+        if contract_list and not tots.get("USD") and not tots.get("") and usd_rows:
+            tots["USD"] = [sum(x[0] or 0 for x in usd_rows), sum(x[1] or 0 for x in usd_rows), sum(x[2] for x in usd_rows)]
+        if contract_list and tots and not (tots.get("USD") or tots.get("")):
+            tot = None  # 원화 합계만 있는 보고서는 달러 시계열에 섞지 않음
+        elif contract_list and tots:
+            tot = tots.get("USD") or tots.get("")
+            if tots.get("KRW"):
+                krw = tots["KRW"][2]
+            if "K$" in unit.replace(" ", "") or "USD" in tots:
+                unit = "K$"
         if not tot and len(items) == 1 and rows_one_ok(b):
             tot = [None, None, list(items.values())[0]]
             tot = _single_total(b, head)
         if tot and tot[2] is not None:
-            return {"unit": unit, "total": tot[0], "deliv": tot[1], "backlog": tot[2], "items": items}
+            return {"unit": unit, "total": tot[0], "deliv": tot[1], "backlog": tot[2], "items": items, "krw_backlog": krw}
     return None
 
 
