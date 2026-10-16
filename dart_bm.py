@@ -455,7 +455,30 @@ def _seg_main(lines):
                 items[kk] = vv
         if items and total and abs(sum(items.values()) - total) <= total * 0.03:
             return {k2: v * mult for k2, v in items.items()}
+        if items and not total:  # 합계 행 없는 표: 품목별 행(비중 열 합이 100% 근처)이면 품목 단위로 다시 읽음
+            r2 = _seg_noTotal(lines, i, hdr, mult)
+            if r2:
+                return r2
         return None
+    return None
+
+
+def _seg_noTotal(lines, i, hdr, mult):
+    items, pct, k = {}, 0.0, i + 1
+    ip = next((x for x, h in enumerate(hdr) if "품목" in h), None)
+    while k < len(lines) and lines[k].startswith("|"):
+        c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+        k += 1
+        if len(c) < 4:
+            continue
+        amt, pc = _num(c[-2]), _num(c[-1])
+        if amt is None or pc is None:
+            continue
+        nm = c[ip] if (ip is not None and len(c) == len(hdr)) else c[0]
+        items[nm] = items.get(nm, 0) + amt
+        pct += pc
+    if len(items) >= 2 and 98 <= pct <= 102:
+        return {k2: v * mult for k2, v in items.items()}
     return None
 
 
