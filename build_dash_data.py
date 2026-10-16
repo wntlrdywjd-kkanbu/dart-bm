@@ -179,10 +179,16 @@ def extra(base, meta, fin):
                      "items": {k: v for k, v in (oh[-1].get("items") or {}).items() if v}, "latest": oh[-1]["key"]}
     ch = fin.get("capa_hist") or []
     if len(ch) >= 3:
+        try:
+            _al = (json.load(open(os.path.join(base, "notes.json"), encoding="utf-8")) or {}).get("capa_alias") or {}
+        except (OSError, ValueError, AttributeError):
+            _al = {}
         def gname(n):
             n = re.sub(r"&cr|\s+", "", n)
             n = re.sub(r"부문t$", "부문", n)
-            return n.replace("부분", "부문")
+            n = n.replace("부분", "부문")
+            n = re.sub(r"^HD(?=Hyundai)", "", n)
+            return _al.get(n, n)
         byk = {c["key"]: {gname(g): v for g, v in c["groups"].items() if gname(g) != "합계"} for c in ch}
         ks = sorted(byk)
         qlab = []
@@ -215,7 +221,7 @@ def extra(base, meta, fin):
                 cq = None if c1 is None or (pv and pv.get("capa") is None) else c1 - c0
                 pq = None if p1 is None else p1 - p0
                 cap.append(cq); prd.append(pq)
-                utl.append(cur.get("util"))  # 보고서가 공시한 연초 누적 가동률 (분기 차이로 다시 계산하면 가동일 기준 차이로 튄다)
+                utl.append(cur.get("util") if (cur.get("util") or 0) <= 100 else None)  # 보고서가 공시한 연초 누적 가동률 (분기 차이로 다시 계산하면 가동일 기준 차이로 튄다)
             if sum(1 for u in utl if u is not None) >= 3:
                 gs.append({"name": g, "unit": unit, "capa": cap, "prod": prd, "util": utl})
         if gs:
