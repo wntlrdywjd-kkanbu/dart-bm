@@ -95,7 +95,9 @@ h2.vd b { color: var(--accent); font-weight: 600; }
   .tag { font-size: 11.5px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); } .tag.pos { color: var(--s3); } .tag.mid { color: var(--s1); }
   .rmeta { font-size: 12.5px; color: var(--muted); margin: 8px 0 4px; } .rvs { margin: 6px 0; max-width: 110ch; } ul.rpts { margin: 6px 0; padding-left: 18px; max-width: 110ch; line-height: 1.7; } ul.rpts li { margin: 5px 0; }
   table.est td { padding: 4px 9px; } .watch { margin: 8px 0 2px; padding: 8px 10px; border-left: 3px solid var(--s1); background: var(--bg); max-width: 110ch; line-height: 1.65; font-size: 13px; }
-  #pick { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; max-width: 100%; }
+  #pickw { position: relative; min-width: 0; } #pick { font: inherit; font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; width: 220px; max-width: 100%; box-sizing: border-box; }
+  #pl { position: absolute; right: 0; } @media (max-width: 640px) { #pl { right: auto; left: 0; } } #pl { top: calc(100% + 4px); z-index: 20; width: 280px; max-width: calc(100vw - 32px); max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+  #pl button { display: flex; justify-content: space-between; gap: 8px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 10px 12px; background: transparent; } #pl button:last-child { border-bottom: 0; } #pl button.on { background: var(--accent-soft); } #pl .c { color: var(--muted); font-family: var(--mono); font-size: 12px; } #pl .none { padding: 10px 12px; color: var(--muted); }
 </style>
 
 <div class="wrap" id="app">
@@ -105,7 +107,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       <div class="sub" id="sub">불러오는 중</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <select id="pick" hidden aria-label="종목 선택"></select>
+      <div id="pickw" hidden><input id="pick" type="search" placeholder="종목명·코드 검색" autocomplete="off" aria-label="종목 검색"><div id="pl" hidden></div></div>
       <button id="btn-save" hidden>HTML로 저장</button>
     </div>
   </header>
@@ -650,13 +652,20 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     unsubS = db.doc("stocks/" + code).onSnapshot(load, function () { $("#detail").innerHTML = "<div class='card empty'>분석 결과를 읽지 못했습니다.</div>"; });
     unsubR = db.doc("research/" + code).onSnapshot(function (sn) { var d = sn.exists ? sn.data() : null; rs = d && d.code === code ? d : null; render(); }, function () { });
   }
+  function pickList(db, q) {
+    var pl = $("#pl"), t = (q || "").trim().toLowerCase();
+    var m = idx.items.filter(function (i) { return !t || i.name.toLowerCase().indexOf(t) >= 0 || i.code.indexOf(t) >= 0; });
+    m.sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    pl.innerHTML = m.length ? m.slice(0, 30).map(function (i) { return "<button type='button' data-c='" + esc(i.code) + "' class='" + (i.code === sel ? "on" : "") + "'><span>" + esc(i.name) + (i.research ? " ★" : "") + "</span><span class='c'>" + esc(i.code) + "</span></button>"; }).join("") : "<div class='none'>검색 결과 없음</div>";
+    pl.hidden = false;
+  }
+  function pickLabel() { var i = idx && idx.items.filter(function (x) { return x.code === sel; })[0]; $("#pick").value = i ? i.name + " (" + i.code + ")" : ""; }
   function onIndex(db, snap) {
     var d = snap.exists ? snap.data() : null;
     if (!d || !d.items || !d.items.length) return false;
-    idx = d; var pk = $("#pick");
-    pk.innerHTML = d.items.map(function (i) { return "<option value='" + esc(i.code) + "'>" + esc(i.name) + " (" + esc(i.code) + ")" + (i.research ? " ★" : "") + "</option>"; }).join("");
-    pk.hidden = false; var c = sel && d.items.some(function (i) { return i.code === sel; }) ? sel : pickCode();
-    pk.value = c; if (c !== sel) openStock(db, c);
+    idx = d; $("#pickw").hidden = false;
+    var c = sel && d.items.some(function (i) { return i.code === sel; }) ? sel : pickCode();
+    if (c !== sel) openStock(db, c); pickLabel();
     return true;
   }
   (async function () {
@@ -666,7 +675,11 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     try {
       var db = window.claude && await window.claude.use("db");
       if (!db) { $("#detail").innerHTML = "<div class='card empty'>저장소에 연결할 수 없습니다. 로그인한 상태에서 다시 열어 주세요.</div>"; $("#sub").textContent = "연결 안 됨"; return; }
-      $("#pick").onchange = function () { openStock(db, this.value); };
+      var pk = $("#pick"), pl = $("#pl");
+      pk.onfocus = function () { if (idx) { pk.select(); pickList(db, ""); } };
+      pk.oninput = function () { if (idx) pickList(db, pk.value); };
+      pl.onclick = function (e) { var b = e.target.closest("button[data-c]"); if (!b) return; pl.hidden = true; pk.blur(); openStock(db, b.getAttribute("data-c")); pickLabel(); };
+      document.addEventListener("click", function (e) { if (!e.target.closest("#pickw")) { pl.hidden = true; pickLabel(); } });
       var legacy = false;
       db.doc("view/index").onSnapshot(function (snap) {
         if (onIndex(db, snap)) return;
