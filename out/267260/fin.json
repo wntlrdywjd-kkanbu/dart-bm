@@ -9,7 +9,7 @@
     "latest_report_nm": "반기보고서 (2026.06)",
     "latest_rcept_no": "20260814003228",
     "latest_rcept_dt": "20260814",
-    "generated_at": "2026-10-16T07:02:21"
+    "generated_at": "2026-10-16T07:04:27"
   },
   "fin": {
     "basis": "연결",
@@ -7225,9 +7225,9 @@
       ],
       "dps": [
         500.0,
-        null,
-        null,
-        null
+        1000.0,
+        5350.0,
+        7100.0
       ],
       "payout": [
         11.08,
@@ -7237,9 +7237,9 @@
       ],
       "yield": [
         1.2,
-        null,
-        null,
-        null
+        1.21,
+        1.54,
+        0.67
       ]
     },
     "capex_notices": [
