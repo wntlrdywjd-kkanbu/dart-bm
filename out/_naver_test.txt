@@ -1,44 +1,47 @@
-### https://m.stock.naver.com/front-api/research/list?category=company&itemCode=003160&page=1&pageSize=3
-http=200 size=1014 url=https://m.stock.naver.com/front-api/research/list?category=company&itemCode=003160&page=1&pageSize=3 ct=application/json; charset=utf-8
-{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"
-### https://m.stock.naver.com/front-api/research/list?category=company&stockCode=003160&page=1&pageSize=3
-http=200 size=1014 url=https://m.stock.naver.com/front-api/research/list?category=company&stockCode=003160&page=1&pageSize=3 ct=application/json; charset=utf-8
-{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"
-### https://m.stock.naver.com/front-api/research/list?category=company&code=003160&page=1&pageSize=3
-http=200 size=1014 url=https://m.stock.naver.com/front-api/research/list?category=company&code=003160&page=1&pageSize=3 ct=application/json; charset=utf-8
-{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"
-### https://m.stock.naver.com/front-api/research/list?category=company&keyword=%EB%94%94%EC%95%84%EC%9D%B4&page=1&pageSize=3
-http=200 size=1014 url=https://m.stock.naver.com/front-api/research/list?category=company&keyword=%EB%94%94%EC%95%84%EC%9D%B4&page=1&pageSize=3 ct=application/json; charset=utf-8
-{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"
-### https://m.stock.naver.com/front-api/research/list?category=company&searchType=itemCode&itemCode=003160&page=1&pageSize=3
-http=200 size=1014 url=https://m.stock.naver.com/front-api/research/list?category=company&searchType=itemCode&itemCode=003160&page=1&pageSize=3 ct=application/json; charset=utf-8
-{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"
-### https://m.stock.naver.com/front-api/research/item/003160?page=1&pageSize=3
-http=404 size=120 url=https://m.stock.naver.com/front-api/research/item/003160?page=1&pageSize=3 ct=application/json; charset=utf-8
-{"message":"Route GET:/front-api/research/item/003160?page=1&pageSize=3 not found","error":"Not Found","statusCode":404}
-### https://m.stock.naver.com/front-api/research/stock/003160?page=1&pageSize=3
-http=404 size=121 url=https://m.stock.naver.com/front-api/research/stock/003160?page=1&pageSize=3 ct=application/json; charset=utf-8
-{"message":"Route GET:/front-api/research/stock/003160?page=1&pageSize=3 not found","error":"Not Found","statusCode":404}
-### https://m.stock.naver.com/api/research/company?itemCode=003160&page=1&pageSize=3
-http=200 size=957 url=https://m.stock.naver.com/api/research/company?itemCode=003160&page=1&pageSize=3 ct=application/json;charset=UTF-8
-[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"3215","endUrl":"https://m.stock.naver.com/research/compa
-### https://m.stock.naver.com/front-api/research/company/96804
-http=404 size=104 url=https://m.stock.naver.com/front-api/research/company/96804 ct=application/json; charset=utf-8
-{"message":"Route GET:/front-api/research/company/96804 not found","error":"Not Found","statusCode":404}
-### https://m.stock.naver.com/front-api/research/detail?category=company&researchId=96804
-http=404 size=131 url=https://m.stock.naver.com/front-api/research/detail?category=company&researchId=96804 ct=application/json; charset=utf-8
-{"message":"Route GET:/front-api/research/detail?category=company&researchId=96804 not found","error":"Not Found","statusCode":404}
-### https://m.stock.naver.com/front-api/research/read?category=company&researchId=96804
-http=404 size=129 url=https://m.stock.naver.com/front-api/research/read?category=company&researchId=96804 ct=application/json; charset=utf-8
-{"message":"Route GET:/front-api/research/read?category=company&researchId=96804 not found","error":"Not Found","statusCode":404}
-### https://m.stock.naver.com/research/company/96804
-http=200 size=45911 url=https://m.stock.naver.com/investment/research/company/96804 ct=text/html; charset=utf-8
+### https://m.stock.naver.com/domestic/stock/085910/research/91065?domesticStockExchange=KRX
+http=200 size=45503 url=https://m.stock.naver.com/domestic/stock/085910/research/91065?domesticStockExchange=KRX ct=text/html; charset=utf-8
+<!DOCTYPE html><html lang="ko" translate="no"><head><meta charSet="utf-8"/><meta charSet="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no,interactive-widget=resizes-content"/><script async="" src="https://ssl.pstatic.ne
+-- hints
+"researchId":"91065","initialFontSizeInCookie":null
+"researchId":"91065"
+__NEXT_DATA__
+### https://m.stock.naver.com/domestic/stock/085910/research
+http=200 size=68693 url=https://m.stock.naver.com/domestic/stock/085910/research ct=text/html; charset=utf-8
 <!DOCTYPE html><html lang="ko" translate="no"><head><meta charSet="utf-8"/><meta charSet="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.
--- html hints
-https://stock.pstatic.net/stock-research/company/57/20261016_company_624558000.pdf
-### https://stock.naver.com/domestic/stock/003160/research
-http=200 size=127234 url=https://stock.naver.com/domestic/stock/003160/research ct=text/html; charset=utf-8
-<!DOCTYPE html><html lang="ko" class="" data-theme="light"><head><meta charSet="utf-8"/><meta name="viewport" content="width=1366, initial-scale=1.0, user-scalable=yes"/><meta name="viewport" content=
-### https://m.stock.naver.com/domestic/stock/003160/research
-http=200 size=71532 url=https://m.stock.naver.com/domestic/stock/003160/research ct=text/html; charset=utf-8
-<!DOCTYPE html><html lang="ko" translate="no"><head><meta charSet="utf-8"/><meta charSet="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.
+### https://m.stock.naver.com/front-api/research/company/91065
+http=404 size=104 url=https://m.stock.naver.com/front-api/research/company/91065 ct=application/json; charset=utf-8
+{"message":"Route GET:/front-api/research/company/91065 not found","error":"Not Found","statusCode":404}
+### https://m.stock.naver.com/front-api/research/detail/91065
+http=404 size=103 url=https://m.stock.naver.com/front-api/research/detail/91065 ct=application/json; charset=utf-8
+{"message":"Route GET:/front-api/research/detail/91065 not found","error":"Not Found","statusCode":404}
+### https://m.stock.naver.com/front-api/research/company/91065?domesticStockExchange=KRX
+http=404 size=130 url=https://m.stock.naver.com/front-api/research/company/91065?domesticStockExchange=KRX ct=application/json; charset=utf-8
+{"message":"Route GET:/front-api/research/company/91065?domesticStockExchange=KRX not found","error":"Not Found","statusCode":404}
+### https://m.stock.naver.com/front-api/research/read?researchId=91065&category=company
+http=404 size=129 url=https://m.stock.naver.com/front-api/research/read?researchId=91065&category=company ct=application/json; charset=utf-8
+{"message":"Route GET:/front-api/research/read?researchId=91065&category=company not found","error":"Not Found","statusCode":404}
+### https://m.stock.naver.com/front-api/research/list?category=company&itemCode=085910&domesticStockExchange=KRX&page=1&pageSize=3
+http=200 size=1014 url=https://m.stock.naver.com/front-api/research/list?category=company&itemCode=085910&domesticStockExchange=KRX&page=1&pageSize=3 ct=application/json; charset=utf-8
+{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"3218","endUrl":"https://m.stock.naver.com/research/company/96804"},{"researchCategory":"종목분석
+### https://m.stock.naver.com/front-api/research/stock/085910?category=company&page=1&pageSize=3
+http=404 size=138 url=https://m.stock.naver.com/front-api/research/stock/085910?category=company&page=1&pageSize=3 ct=application/json; charset=utf-8
+{"message":"Route GET:/front-api/research/stock/085910?category=company&page=1&pageSize=3 not found","error":"Not Found","statusCode":404}
+### https://m.stock.naver.com/front-api/research/list/085910?category=company&page=1&pageSize=3
+http=404 size=137 url=https://m.stock.naver.com/front-api/research/list/085910?category=company&page=1&pageSize=3 ct=application/json; charset=utf-8
+{"message":"Route GET:/front-api/research/list/085910?category=company&page=1&pageSize=3 not found","error":"Not Found","statusCode":404}
+### https://m.stock.naver.com/front-api/research/list?category=company&reutersCode=085910&page=1&pageSize=3
+http=200 size=1014 url=https://m.stock.naver.com/front-api/research/list?category=company&reutersCode=085910&page=1&pageSize=3 ct=application/json; charset=utf-8
+{"isSuccess":true,"detailCode":"","message":"","result":[{"researchCategory":"종목분석","category":"종목분석","itemCode":"034020","itemName":"두산에너빌리티","researchId":96804,"title":"연내 SMR 추가 수주 기대","brokerName":"하나증권","writeDate":"2026-10-16","readCount":"3218","endUrl":"https://m.stock.naver.com/research/company/96804"},{"researchCategory":"종목분석
+### https://m.stock.naver.com/front-api/domestic/stock/085910/research?page=1&pageSize=3
+http=404 size=130 url=https://m.stock.naver.com/front-api/domestic/stock/085910/research?page=1&pageSize=3 ct=application/json; charset=utf-8
+{"message":"Route GET:/front-api/domestic/stock/085910/research?page=1&pageSize=3 not found","error":"Not Found","statusCode":404}
+### https://m.stock.naver.com/api/domestic/stock/085910/research?page=1&pageSize=3
+http=404 size=4209 url=https://m.stock.naver.com/api/domestic/stock/085910/research?page=1&pageSize=3 ct=text/html;charset=UTF-8
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0,user-scalable=no">
+    <title>Npay 증권</title>
+    <link rel="shortcut icon" href="https://ssl.pstatic.net/imgstock/favicon.ico">
+    <link rel="stylesheet" type="text/css" href="https://ssl.pstatic.net/imgstock/static.mob
