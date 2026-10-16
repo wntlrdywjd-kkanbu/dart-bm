@@ -13,7 +13,7 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
 
@@ -25,12 +25,14 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: DART 수집 및 bm_card 생성
+        timeout-minutes: 40
         env:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
           QUERY: ${{ inputs.query }}
         run: python dart_bm.py "$QUERY"
 
       - name: 결과 커밋
+        if: always()
         env:
           QUERY: ${{ inputs.query }}
         run: |
