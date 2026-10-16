@@ -22,6 +22,7 @@ def parse_table(t):
     blob = " ".join(t.get("ctx", [])[-2:]) + " " + " ".join(rows[:2])
     mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", blob)
     mult = {"백만원": 1e6, "천원": 1e3, "원": 1.0}.get(mu.group(1) if mu else "천원", 1e3)
+    unit_known = bool(mu)
     quarterly = any("3개월" in r for r in rows[:3])
     q, cum, total = {}, {}, None
     for r in rows:
@@ -32,7 +33,7 @@ def parse_table(t):
         vals = [_n(c) for c in cells[1:]]
         if not name or vals[0] is None or name in ("구분", "구 분"):
             continue
-        nn = re.sub(r"\s", "", name)
+        nn = re.sub(r"\(\*+\d*\)", "", re.sub(r"\s", "", name))
         is_tot = nn.startswith(("합계", "계")) or nn.endswith("합계")
         if quarterly:
             if len(vals) < 2 or vals[1] is None:
@@ -47,7 +48,7 @@ def parse_table(t):
         cum[name] = cum.get(name, 0.0) + b
     if total is None or len(q) < 4:
         return None
-    return {"q": q, "cum": cum, "total": total, "quarterly": quarterly}
+    return {"q": q, "cum": cum, "total": total, "quarterly": quarterly, "unit_known": unit_known}
 
 
 def load(cache_dir="cache/cost", files=None):
@@ -94,8 +95,38 @@ def label(k):
     return f"{k[2:4]}.{int(k[5:]) // 3}Q"
 
 
+def _fix_units(rep, q20):
+    """표에 단위 표기가 없는 보고서: 합계 비용 / 매출액 비율이 1에 가장 가까워지도록 단위(×1e-3/1/×1e3)를 고른다."""
+    import math
+    lab = {l: i for i, l in enumerate(q20["labels"])}
+    out = {}
+    for k, r in rep.items():
+        if r.get("unit_known", True):
+            out[k] = r
+            continue
+        m = int(k[5:])
+        if r["quarterly"] or m == 3:
+            i = lab.get(label(k))
+            R = q20["매출액"][i] if i is not None else None
+            tot = r["total"][0]
+        else:
+            idx = [lab.get(f"{k[2:4]}.{q}Q") for q in (1, 2, 3, 4)]
+            R = sum(q20["매출액"][j] for j in idx) if all(j is not None and q20["매출액"][j] for j in idx) else None
+            tot = r["total"][1]
+        if not R or not tot:
+            out[k] = r
+            continue
+        g = min((1e-3, 1.0, 1e3), key=lambda g: abs(math.log(tot * g / R)))
+        if g != 1.0:
+            r = {**r, "q": {n: v * g for n, v in r["q"].items()}, "cum": {n: v * g for n, v in r["cum"].items()},
+                 "total": (r["total"][0] * g, r["total"][1] * g)}
+        out[k] = r
+    return out
+
+
 def build(rep, q20, overrides=None, semi=0.5):
     """rep: load() 결과. q20: 대시보드 20분기 시계열(원 단위, labels/매출액/영업이익). 반환: 대시보드용 dict 또는 None"""
+    rep = _fix_units(rep, q20)
     qq = quarters(rep)
     keys = sorted(qq)
     if len(keys) < 5:

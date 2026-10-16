@@ -377,11 +377,11 @@ def collect_dividend(corp_code, annual_year):
             se, knd = norm(r.get("se")), norm(r.get("stock_knd"))
             if "주당" in se:
                 print(f"[배당 {by}] se={r.get('se')!r} knd={r.get('stock_knd')!r} 당={r.get('thstrm')!r} 전={r.get('frmtrm')!r} 전전={r.get('lwfr')!r}")
-            if "주당현금배당금" in se and knd in ("보통주", ""):
+            if "주당현금배당금" in se and knd in ("보통주", "", "-"):
                 key = "dps"
             elif "현금배당성향" in se:
                 key = "payout"
-            elif "현금배당수익률" in se and knd in ("보통주", ""):
+            elif "현금배당수익률" in se and knd in ("보통주", "", "-"):
                 key = "yield"
             else:
                 continue
