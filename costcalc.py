@@ -79,9 +79,13 @@ def quarters(rep):
         r = rep[k]
         if m == 12:
             prev = rep.get(f"{y}.09")
-            if prev and prev["quarterly"]:
+            if prev:
                 names = set(r["cum"]) | set(prev["cum"])
                 res[k] = {n: r["cum"].get(n, 0.0) - prev["cum"].get(n, 0.0) for n in names}
+        elif not r["quarterly"] and m in (6, 9):  # 3개월 열 없이 누적만 있는 반기·3분기 표: 직전 분기 누적과의 차
+            pk = f"{y}.{m - 3:02d}"
+            if pk in rep:
+                res[k] = {n: r["cum"].get(n, 0.0) - rep[pk]["cum"].get(n, 0.0) for n in set(r["cum"]) | set(rep[pk]["cum"])}
         elif r["quarterly"]:
             res[k] = dict(r["q"])
             if m == 6 and f"{y}.03" not in rep:  # 1Q 보고서에 주석이 없으면 반기 누적 − 2Q(3개월)

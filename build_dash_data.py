@@ -191,7 +191,7 @@ def extra(base, meta, fin):
                 usd, krw = {}, {}
                 for (dt_, cur_), v_ in first.items():
                     qk_ = f"{dt_[2:4]}.{((int(dt_[5:7]) - 1) // 3 + 1) * 3}"
-                    if cur_ == "KRW":
+                    if cur_ == "KRW" and us:
                         krw[qk_] = krw.get(qk_, 0) + v_ * 1e6 / 1e8
                     else:
                         usd[qk_] = usd.get(qk_, 0) + v_ * mult / div

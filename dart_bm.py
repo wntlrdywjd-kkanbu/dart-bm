@@ -496,9 +496,41 @@ def _seg_noTotal(lines, i, hdr, mult):
     return None
 
 
+def _seg_inline(lines):
+    """헤더 마지막 칸이 '매출액 (비율)' 이고 값이 '6,443 (9.8%)' 형태인 제품 현황 표. 합계 행과 3% 이내로 맞으면 품목별 매출(원)."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or "매출액" not in ln:
+            continue
+        hdr = [c.strip() for c in ln.strip().strip("|").split("|")]
+        if len(hdr) < 3 or not re.fullmatch(r"매출액\s*\(\s*(비율|비중|구성비)\s*\)", hdr[-1]):
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        ip = next((x for x, h in enumerate(hdr) if "품목" in h.replace(" ", "")), None)
+        items, total, k = {}, None, i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            mm = re.match(r"^(-?[\d,]+)\s*\(", c[-1]) if c else None
+            if not mm:
+                continue
+            amt = float(mm.group(1).replace(",", ""))
+            if re.sub(r"\s+", "", c[0]) in ("합계", "계", "총계"):
+                total = amt
+                continue
+            nm = c[ip] if (ip is not None and len(c) == len(hdr)) else c[0]
+            items[re.sub(r"\(.*", "", nm).strip() or nm] = items.get(nm, 0) + amt
+        if items and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k2: v * mult for k2, v in items.items()}
+        return None
+    return None
+
+
 def seg_from_lines(lines):
     r = _seg_main(lines)
-    return r or _seg_product(lines)
+    return r or _seg_inline(lines) or _seg_product(lines)
 
 
 def _seg_product(lines):
@@ -608,7 +640,7 @@ def _contract_rows(b, head):
         amt = [nums[-5], nums[-3], nums[-1]] if ("수량" in head and len(nums) >= 6) else nums[-3:]
         if amt[0] is None:
             continue
-        out.append({"date": dts[0], "cur": cur or "USD", "total": amt[0], "deliv": amt[1], "backlog": amt[2]})
+        out.append({"date": dts[0], "cur": cur, "total": amt[0], "deliv": amt[1], "backlog": amt[2]})
     return out
 
 
@@ -896,6 +928,7 @@ def collect_capex_notices(corp_code, d, years=5, maxn=40):
 # ---------------------------------------------------------------- 내수·수출 매출 시계열 (사업의 내용 '매출 실적' 표)
 def region_from_lines(lines):
     """'매출 실적' 표(구분 열에 내수/수출/합계)에서 당기(첫 숫자 열) 내수·수출 합계. 단위는 원으로 환산. 못 찾으면 None."""
+    lines = [re.sub(r"\(\s*(?:US)?\$\s*[\d,\.]+\s*\)", "", l) if "$" in l else l for l in lines]  # '2,085 ($1,369)' 의 달러 병기 제거
     blocks = split_blocks(lines)
     dom = exp = 0.0
     found = 0
