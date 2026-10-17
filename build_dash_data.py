@@ -408,6 +408,8 @@ def build(code):
     except OSError:
         pass
     doc.update(extra(base, meta, fin))
+    for h_ in (doc.get("notes") or {}).get("hide") or []:  # notes.hide: 파싱 값이 의미 없는 섹션 숨김(예: 생산능력 기준 재산출로 분기 차분이 음수)
+        doc.pop(h_, None)
     s = json.dumps(doc, ensure_ascii=False)
     assert len(s.encode("utf-8")) < 240_000, f"{code}: {len(s)} bytes"
     json.dump(doc, open(os.path.join(base, "dash.json"), "w", encoding="utf-8"), ensure_ascii=False)
