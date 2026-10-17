@@ -99,7 +99,7 @@ def extra(base, meta, fin):
             ts = r.get("trades") or []
             if ts:
                 for t in ts:
-                    flat.append([r["dt"], r["who"], r["pos"], t["reason"], t["date"], t["price"], (t["price"] * t["chg"]) if t.get("price") else None, t["before"], t["chg"], t["after"]])
+                    flat.append([r["dt"], r["who"], r["pos"], t["reason"] + ((" · " + t["note"][:24]) if t.get("note") else ""), t["date"], t["price"], (t["price"] * t["chg"]) if t.get("price") else None, t["before"], t["chg"], t["after"]])
             else:
                 flat.append([r["dt"], r["who"], r["pos"], "", r["dt"], None, None, None, r["chg"], r["own"]])
         flat.sort(key=lambda x: (x[4], x[0]), reverse=True)

@@ -1037,7 +1037,7 @@ def collect_insider(corp_code, d):
     return rows
 
 
-DATE_RE = re.compile(r"(\d{4})\.(\d{2})\.(\d{2})")
+DATE_RE = re.compile(r"(\d{4})\s*[.년]\s*(\d{1,2})\s*[.월]\s*(\d{1,2})")
 
 
 def parse_insider(lines):
@@ -1052,7 +1052,8 @@ def parse_insider(lines):
         chg = _num(c[4])
         if chg is None:
             continue
-        out.append({"reason": c[0], "date": DATE_RE.search(c[1]).group(0).replace(".", "-"), "kind": c[2],
+        out.append({"reason": c[0], "date": "-".join(("%s-%02d-%02d" % tuple(map(int, DATE_RE.search(c[1]).groups()))).split("-")), "kind": c[2],
+                    "note": (c[7] if len(c) > 7 and c[7] != "-" else ""),
                     "before": _num(c[3]), "chg": chg, "after": _num(c[5]), "price": _num(c[6])})
     return out
 
