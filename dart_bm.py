@@ -782,7 +782,14 @@ def capa_from_lines(lines):
             elif len(cells) >= 3 and _lab(cells[1]):
                 lab, cur, name, vals = _lab(cells[1]), cells[0], cells[0], cells[2:]
             else:
-                continue
+                # 사업부문|회사|품목|사업소|구분(생산능력)|당기… 처럼 구분 열이 뒤에 있는 표: 앞 칸이 모두 글자일 때만 인정
+                j = next((j for j in range(2, min(5, len(cells) - 1)) if _lab(cells[j]) and not any(re.fullmatch(r"-?[\d,.]+%?", c.replace(" ", "")) for c in cells[:j])), None)
+                if j is not None and cells[0]:
+                    lab, cur, name, vals = _lab(cells[j]), cells[0], cells[0], cells[j + 1:]
+                else:
+                    if cells and cells[0] and _lab(cells[0]) is None and not re.fullmatch(r"-?[\d,.]+%?", cells[0].replace(" ", "")) and len(cells) >= 4:
+                        cur = cells[0]  # 가동률 라벨이 없는 새 부문 행(예: 선박 조립) 뒤의 값이 이전 부문에 섞이지 않게 한다
+                    continue
             if not name:
                 continue
             v = None
