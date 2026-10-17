@@ -179,10 +179,10 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     return "<figure class='chart'><figcaption><b>" + esc(title) + "</b><span>" + esc(sub) + "</span></figcaption><svg viewBox='0 0 " + W + " " + H + "' role='img' aria-label='" + esc(aria) + "'>" + inner + "</svg></figure>";
   }
   // 막대(단일 계열). yoyBase=true 이면 4칸 앞(전년 동기) 대비 증감률 표시
-  function barOne(title, sub, labels, vals, u, yoyBase, pre) {
+  function barOne(title, sub, labels, vals, u, yoyBase, pre, ov) {
     var ok = vals.filter(function (v) { return v != null; });
     if (!ok.length) return chartBox(title, sub, "<text x='20' y='60'>데이터 없음</text>", title);
-    var f = frame(ok, u, true), n = labels.length, slot = f.pw / n, bw = Math.min(30, slot * 0.6);
+    var f = frame(ok.concat((ov || []).filter(function (v) { return v != null; })), u, true), n = labels.length, slot = f.pw / n, bw = Math.min(30, slot * 0.6);
     function y(v) { return T + f.ph - (v - f.mn) / (f.mx - f.mn) * f.ph; }
     var s = grid(f, u), y0 = y(0);
     labels.forEach(function (lb, k) {
@@ -204,6 +204,16 @@ h2.vd b { color: var(--accent); font-weight: 600; }
         else if ((n - 1 - k) % 2 === 0) s += "<text class='" + yc + (n >= 12 ? " sm" : "") + "' x='" + cx + "' y='" + (H - 8) + "' text-anchor='middle'>" + (n >= 12 && k !== n - 1 && /%$/.test(yt) ? yt.slice(0, -1) : yt) + "</text>";
       }
     });
+    if (ov && ov.some(function (v) { return v != null; })) {
+      var pd = "", dots = "";
+      ov.forEach(function (v, k) {
+        if (v == null) return;
+        var cx = L + slot * k + slot / 2;
+        pd += (pd && ov[k - 1] != null ? "L" : "M") + cx + " " + y(v) + " ";
+        dots += "<circle cx='" + cx + "' cy='" + y(v) + "' r='3.5' fill='var(--s3)' stroke='var(--surface)' stroke-width='2'><title>" + esc(labels[k] + " 잔고 증감 기반 추정 " + fmtN(v, u)) + "</title></circle>";
+      });
+      s += "<path d='" + pd + "' fill='none' stroke='var(--s3)' stroke-width='2' stroke-dasharray='5 3'/>" + dots;
+    }
     return chartBox(title, sub, s, title + " 분기 추이");
   }
   function lineOne(title, sub, labels, vals) {
@@ -524,8 +534,8 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       var ol = od.backlog.length - 1, bl = od.backlog, bq = ol > 0 ? bl[ol - 1] : null, by_ = ol >= 4 ? bl[ol - 4] : null;
       var gq = function (a, b) { return (a != null && b > 0) ? ((a - b) / b * 100) : null; }, gy2 = gq(bl[ol], by_), gq2 = gq(bl[ol], bq);
       var nl = od.new.length - 1, nlast = od.new[nl];
-      h += sec(s, "orders", "일감은 얼마나 쌓여 있나", "수주잔고 **" + Math.round(bl[ol]).toLocaleString("ko-KR") + " " + esc(od.unit) + "**" + (gq2 != null ? ", 전분기 대비 " + (gq2 > 0 ? "+" : "") + gq2.toFixed(0) + "%" : "") + (od.krw && od.krw[ol] ? " + 원화 계약 잔고 **" + Math.round(od.krw[ol]).toLocaleString("ko-KR") + "억원**" : "") + (gy2 != null ? ", 전년 동기 대비 " + (gy2 > 0 ? "+" : "") + gy2.toFixed(0) + "%(달러 기준)" : "") + (nlast != null ? (od.kind === "ctr" ? ". 이번 분기 신규 계약(공시 기준) " : ". 이번 분기 신규수주(추정) ") + (Math.round(nlast * 10) / 10).toLocaleString("ko-KR") + " " + esc(od.unit) + (od.kind === "ctr" && od.new_krw && od.new_krw[nl] ? " + 원화 " + Math.round(od.new_krw[nl]).toLocaleString("ko-KR") + "억원" : "") : "") + ".",
-        "<div class='charts'>" + barOne("수주잔고", "분기말 · " + od.unit + " · 아래 %는 전년 동기 대비", od.labels, bl, "백만", true, []) + barOne(od.kind === "ctr" ? "신규 계약 (공시 기준)" : "신규수주 (추정)", od.kind === "ctr" ? "분기 · " + od.unit + " · 수주일자 기준, 첫 공시 금액" : "분기 · " + od.unit + " · 납품 + 잔고 증감", od.labels, od.new, "백만", true, []) + "</div><div class='meta'>각 정기보고서(분기·반기·사업)의 '수주상황' 합계 표에서 읽었습니다. " + (od.kind === "ctr" ? "신규 수주계약은 표에 나열된 계약을 수주일자 분기별로 모은 값(해당 계약이 처음 공시된 금액)입니다. 공시 대상(전년 매출 5% 이상) 계약만 있고, 한 분기 안에 납품까지 끝난 계약이나 보고서가 없는 분기(빈 막대)는 잡히지 않아 실제보다 작을 수 있습니다. 표의 수주총액 합계는 과거 계약이 누적되어 신규수주가 아닙니다. 원화 계약은 달러 잔고에 합치지 않았습니다. 단위는 회사가 공시한 통화 기준입니다." : "신규수주는 공시값이 아니라 분기 납품액(기납품액의 누적 차이)에 잔고 증감을 더한 추정치이고, 집계 기간이 맞지 않는 분기는 비워 두었습니다. 단위는 회사가 공시한 통화 기준입니다.") + "</div>" + (ob ? "<details><summary>최신 수주 표 (원문)</summary>" + ob + "</details>" : ""));
+      h += sec(s, "orders", "일감은 얼마나 쌓여 있나", "수주잔고 **" + Math.round(bl[ol]).toLocaleString("ko-KR") + " " + esc(od.unit) + "**" + (gq2 != null ? ", 전분기 대비 " + (gq2 > 0 ? "+" : "") + gq2.toFixed(0) + "%" : "") + (od.krw && od.krw[ol] ? " + 원화 계약 잔고 **" + Math.round(od.krw[ol]).toLocaleString("ko-KR") + "억원**" : "") + (gy2 != null ? ", 전년 동기 대비 " + (gy2 > 0 ? "+" : "") + gy2.toFixed(0) + "%(달러 기준)" : "") + (nlast != null ? (od.kind === "ctr" ? ". 이번 분기 신규 계약(공시된 건만, 최소치) " : ". 이번 분기 신규수주(추정) ") + (Math.round(nlast * 10) / 10).toLocaleString("ko-KR") + " " + esc(od.unit) + (od.kind === "ctr" && od.new_krw && od.new_krw[nl] ? " + 원화 " + Math.round(od.new_krw[nl]).toLocaleString("ko-KR") + "억원" : "") + (od.kind === "ctr" && od.est && od.est[nl] != null ? ", 잔고 증감 기반 추정 약 " + Math.round(od.est[nl]).toLocaleString("ko-KR") + " " + esc(od.unit) : "") : "") + ".",
+        "<div class='charts'>" + barOne("수주잔고", "분기말 · " + od.unit + " · 아래 %는 전년 동기 대비", od.labels, bl, "백만", true, []) + barOne(od.kind === "ctr" ? "신규 계약 (공시된 건, 최소치)" : "신규수주 (추정)", od.kind === "ctr" ? "분기 · " + od.unit + " · 막대=수주일자 기준 공시 금액" + (od.est ? " · 점선=잔고 증감+매출 추정" : "") : "분기 · " + od.unit + " · 납품 + 잔고 증감", od.labels, od.new, "백만", true, [], od.kind === "ctr" ? od.est : null) + "</div><div class='meta'>각 정기보고서(분기·반기·사업)의 '수주상황' 합계 표에서 읽었습니다. " + (od.kind === "ctr" ? "신규 수주계약은 표에 나열된 계약을 수주일자 분기별로 모은 값(해당 계약이 처음 공시된 금액)입니다. 공시 대상(전년 매출 5% 이상) 계약만 있어 소액 계약은 빠지고, 한 분기 안에 납품까지 끝난 계약이나 보고서가 없는 분기(빈 막대)도 잡히지 않으므로 막대는 실제보다 작은 최소치입니다. 점선은 기말 잔고 − 기초 잔고 + 그 분기 매출(소액 매출 포함)로 계산한 추정으로, 목록에 없는 계약의 수주나 취소·변경, 작성일 이후 계약(예: 7월 체결분이 6월 잔고에 포함)의 영향이 섞여 있어 실제 신규수주는 두 값 사이일 가능성이 큽니다. 표의 수주총액 합계는 과거 계약이 누적되어 신규수주가 아닙니다. 원화 계약은 달러 잔고에 합치지 않았습니다. 단위는 회사가 공시한 통화 기준입니다." : "신규수주는 공시값이 아니라 분기 납품액(기납품액의 누적 차이)에 잔고 증감을 더한 추정치이고, 집계 기간이 맞지 않는 분기는 비워 두었습니다. 단위는 회사가 공시한 통화 기준입니다.") + "</div>" + (ob ? "<details><summary>최신 수주 표 (원문)</summary>" + ob + "</details>" : ""));
     } else if (ob) h += "<section class='card sec' id='orders'><div class='q'>일감은 얼마나 쌓여 있나</div><h2 class='vd'>수주 현황 (공시 원문 표)</h2>" + ob + "</section>";
     var cp = s.capa;
     if (cp && cp.groups.length) {

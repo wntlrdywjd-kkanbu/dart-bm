@@ -199,6 +199,16 @@ def extra(base, meta, fin):
                 ex["ord"]["new"] = [(usd.get(l_, 0.0) if h_ else None) for l_, h_ in zip(labels, has_)]
                 ex["ord"]["new_krw"] = [(krw.get(l_, 0.0) if h_ else None) for l_, h_ in zip(labels, has_)]
                 ex["ord"]["kind"] = "ctr"
+                if not us:  # 잔고 증감 + 분기 매출 방식 추정(원화 잔고 회사만: 매출과 같은 통화)
+                    rq = dict(zip(q20["labels"], q20["매출액"]))
+                    est_ = []
+                    for i_, l_ in enumerate(labels):
+                        rv_ = rq.get(f"{l_.split('.')[0]}.{int(l_.split('.')[1]) // 3}Q")
+                        ok_ = i_ > 0 and bl[i_] is not None and bl[i_ - 1] is not None and rv_ is not None
+                        e_ = (bl[i_] - bl[i_ - 1] + rv_ / 1e8) if ok_ else None
+                        est_.append(e_ if (e_ is not None and e_ >= 0) else None)
+                    if any(e is not None for e in est_):
+                        ex["ord"]["est"] = est_
         except (OSError, ValueError, AttributeError):
             pass
     ch = fin.get("capa_hist") or []
