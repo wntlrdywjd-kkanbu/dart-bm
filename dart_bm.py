@@ -581,6 +581,37 @@ def _single_total(b, head):
     return None
 
 
+_CTR_DATE = re.compile(r"(\d{4})\s*[-.년]\s*(\d{1,2})\s*[-.월]\s*(\d{1,2})")
+
+
+def _contract_rows(b, head):
+    """계약 목록형 수주 표에서 계약별 {date, cur, total, deliv, backlog}. 수량·금액 쌍 표는 금액만. 통화 열이 없으면 단위(K$)를 USD로 본다."""
+    out = []
+    for r in b["rows"]:
+        cells = [x.strip() for x in r.strip().strip("|").split("|")]
+        if not cells or re.match(r"^(합|계|총|소)", re.sub(r"\s+", "", cells[0])):
+            continue
+        dts, cur, nums = [], "", []
+        for c in cells:
+            c2 = c.replace(" ", "")
+            md = _CTR_DATE.fullmatch(c2) or _CTR_DATE.match(c2)
+            if md and len(c2) <= 14:
+                dts.append("%04d-%02d-%02d" % tuple(int(x) for x in md.groups()))
+            elif c2.upper() in ("USD", "KRW", "EUR", "JPY", "CNY"):
+                cur = c2.upper()
+            elif _NUMTOK.match(c2):
+                nums.append(_num(c2))
+            elif c2 in ("-", "", "–"):
+                nums.append(None)
+        if not dts or len(nums) < 3:
+            continue
+        amt = [nums[-5], nums[-3], nums[-1]] if ("수량" in head and len(nums) >= 6) else nums[-3:]
+        if amt[0] is None:
+            continue
+        out.append({"date": dts[0], "cur": cur or "USD", "total": amt[0], "deliv": amt[1], "backlog": amt[2]})
+    return out
+
+
 def order_series(biz):
     """수주상황 표 1개에서 합계(수주총액·기납품액·수주잔고)와 품목별 잔고를 읽는다. 실패하면 None."""
     if not biz:
@@ -644,7 +675,9 @@ def order_series(biz):
             tot = [None, None, list(items.values())[0]]
             tot = _single_total(b, head)
         if tot and tot[2] is not None:
-            return {"unit": unit, "total": tot[0], "deliv": tot[1], "backlog": tot[2], "items": items, "krw_backlog": krw}
+            res_ = {"unit": unit, "total": tot[0], "deliv": tot[1], "backlog": tot[2], "items": items, "krw_backlog": krw}
+            res_["contracts"] = _contract_rows(b, head)
+            return res_
     return None
 
 

@@ -180,6 +180,23 @@ def extra(base, meta, fin):
         try:
             if (json.load(open(os.path.join(base, "notes.json"), encoding="utf-8")) or {}).get("orders_no_new"):
                 ex["ord"].update({"deliv": [None] * len(labels), "new": [None] * len(labels), "items": {}})  # 계약 목록형 표: 누적 납품 차이로 신규수주를 추정할 수 없음
+            if ex["ord"].get("items") == {} and any(o.get("contracts") for o in oh):
+                # 계약 목록형: 수주일자 기준 신규 계약(첫 공시 금액). 공시 대상(전년 매출 5% 이상) 계약만이라 최소치
+                first = {}
+                for o in oh:
+                    for c_ in o.get("contracts") or []:
+                        first.setdefault((c_["date"], c_["cur"]), c_["total"])
+                usd, krw = {}, {}
+                for (dt_, cur_), v_ in first.items():
+                    qk_ = f"{dt_[2:4]}.{((int(dt_[5:7]) - 1) // 3 + 1) * 3}"
+                    if cur_ == "KRW":
+                        krw[qk_] = krw.get(qk_, 0) + v_ * 1e6 / 1e8
+                    else:
+                        usd[qk_] = usd.get(qk_, 0) + v_ * mult / div
+                has_ = [by.get(f"{2000 + int(l_.split('.')[0])}.{int(l_.split('.')[1]):02d}") is not None for l_ in labels]
+                ex["ord"]["new"] = [(usd.get(l_, 0.0) if h_ else None) for l_, h_ in zip(labels, has_)]
+                ex["ord"]["new_krw"] = [(krw.get(l_, 0.0) if h_ else None) for l_, h_ in zip(labels, has_)]
+                ex["ord"]["kind"] = "ctr"
         except (OSError, ValueError, AttributeError):
             pass
     ch = fin.get("capa_hist") or []
