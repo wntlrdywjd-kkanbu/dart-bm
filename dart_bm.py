@@ -142,15 +142,29 @@ def list_periodic(corp_code):
         rows += j.get("list") or []
         total = int(j.get("total_page") or 1)
         page += 1
-    best = {}
+    best, allv = {}, {}
     for r in rows:
         m = PERIODIC_RE.search(r.get("report_nm", ""))
         if not m:
             continue  # 자율공시·기타 공시 제외
         key = (int(m.group(2)), int(m.group(3)))
         r = dict(r, kind=m.group(1), year=key[0], month=key[1])
+        allv.setdefault(key, []).append(r)
         if key not in best or (r["rcept_dt"], r["rcept_no"]) > (best[key]["rcept_dt"], best[key]["rcept_no"]):
             best[key] = r
+    # [첨부정정]은 첨부만 바꾼 정정이라 원문 파일이 없을 수 있음 → 원문이 없으면 같은 기간의 이전 접수본 사용
+    for key, r in list(best.items()):
+        if "첨부정정" not in r.get("report_nm", ""):
+            continue
+        for alt in sorted(allv[key], key=lambda x: (x["rcept_dt"], x["rcept_no"]), reverse=True):
+            try:
+                get_biz(alt["rcept_no"])
+            except RuntimeError:
+                continue
+            best[key] = alt
+            if alt["rcept_no"] != r["rcept_no"]:
+                print(f"[안내] {key} {r['report_nm']} 원문 없음 → {alt['report_nm']}({alt['rcept_no']}) 사용")
+            break
     reps = [best[k] for k in sorted(best, reverse=True)]
     if not any(r["kind"] == "사업" for r in reps):
         raise RuntimeError("사업보고서 없음 (최근 3년 내 정기보고서 목록에 '사업보고서 (YYYY.MM)' 없음)")
