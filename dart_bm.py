@@ -847,13 +847,15 @@ def collect_cost_raw(reps, maxn=20):
                 near = " ".join(ctx[-8:])
                 body = " ".join(lines[i:j])
                 if (any(k in near for k in COST_KEYS) or ("성격" in body[:200])) and j - i >= 4:
-                    out.append({"ctx": ctx[-4:], "rows": lines[i:j][:80]})
+                    c2_ = " ".join(ctx[-2:])
+                    pr_ = 0 if ("비용의 성격별" in c2_ and "기능별" not in c2_) else 1  # 주석 앞쪽의 '성격별 비용의 기능별 배분' 표들이 6칸을 채우지 않게 본 표를 먼저
+                    out.append((pr_, {"ctx": ctx[-4:], "rows": lines[i:j][:80]}))
                 i = j
                 continue
             if l.strip():
                 ctx.append(l.strip()[:160])
             i += 1
-        json.dump({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"], "tables": out[:6]}, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
+        json.dump({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"], "tables": [t_ for _, t_ in sorted(out, key=lambda x: x[0])][:6]}, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
         n.append(f"{r['rcept_no']}.json")
     return n
 
