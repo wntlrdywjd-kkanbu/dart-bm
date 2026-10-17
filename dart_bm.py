@@ -1026,8 +1026,12 @@ def collect_insider(corp_code, d):
             if os.path.exists(fp):
                 r["trades"] = json.load(open(fp, encoding="utf-8"))
             else:
-                r["trades"] = parse_insider(to_text(fetch_doc(r["no"])))
+                _tx = to_text(fetch_doc(r["no"]))
+                r["trades"] = parse_insider(_tx)
                 json.dump(r["trades"], open(fp, "w", encoding="utf-8"), ensure_ascii=False)
+                if not r["trades"] and len(os.listdir(os.path.join(d, "insider_raw")) if os.path.isdir(os.path.join(d, "insider_raw")) else []) < 4:
+                    os.makedirs(os.path.join(d, "insider_raw"), exist_ok=True)  # 파서가 0건인 소유상황 원문 점검용
+                    open(os.path.join(d, "insider_raw", f"{r['no']}.txt"), "w", encoding="utf-8").write("\n".join(_tx)[:6000] if isinstance(_tx, list) else str(_tx)[:6000])
         except Exception as e:
             print(f"[경고] 내부자 원문 {r['no']} 실패: {e}", file=sys.stderr)
     return rows
