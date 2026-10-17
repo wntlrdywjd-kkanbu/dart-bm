@@ -154,7 +154,7 @@ def extra(base, meta, fin):
         by = {o["key"]: o for o in oh}
         ys = int(qkeys[0][:4])
         ye = int(qkeys[-1][:4])
-        labels, bl, dl, nw = [], [], [], []
+        labels, bl, dl, nw, krw_l = [], [], [], [], []
         prevb = None
         for y in range(ys, ye + 1):
             for m in (3, 6, 9, 12):
@@ -163,6 +163,7 @@ def extra(base, meta, fin):
                     continue
                 o = by.get(k)
                 labels.append(f"{str(y)[2:]}.{m}")
+                krw_l.append((o.get("krw_backlog") or 0) * 1e6 / 1e8 if o else None)
                 b = o["backlog"] * mult / div if o else None
                 q = None
                 if o and o.get("deliv") is not None:
@@ -176,7 +177,8 @@ def extra(base, meta, fin):
                 bl.append(b); dl.append(q); nw.append(n_)
                 prevb = b
         ex["ord"] = {"unit": uname, "labels": labels, "backlog": bl, "deliv": dl, "new": nw,
-                     "items": {k: v for k, v in (oh[-1].get("items") or {}).items() if v}, "latest": oh[-1]["key"]}
+                     "items": {k: v for k, v in (oh[-1].get("items") or {}).items() if v}, "latest": oh[-1]["key"],
+                     **({"krw": krw_l} if any(krw_l) else {})}
         try:
             if (json.load(open(os.path.join(base, "notes.json"), encoding="utf-8")) or {}).get("orders_no_new"):
                 ex["ord"].update({"deliv": [None] * len(labels), "new": [None] * len(labels), "items": {}})  # 계약 목록형 표: 누적 납품 차이로 신규수주를 추정할 수 없음
