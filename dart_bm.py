@@ -674,7 +674,7 @@ def order_series(biz):
             name = re.sub(r"\s+", "", r.strip().strip("|").split("|")[0])
             nums = _cellnums(r)
             vals = [v for v in nums if v is not None]
-            if len(vals) >= 6 and "수량" in head:
+            if "수량" in head and (len(vals) >= 6 or (len(nums) == 6 and len(vals) >= 2)):  # 수량 열이 "-" 인 행도 금액 열 위치로 읽는다
                 amt = [nums[1], nums[3], nums[5]] if len(nums) == 6 else [vals[-5], vals[-3], vals[-1]]
             elif len(nums) >= 3 and len(vals) >= 2:
                 amt = nums[-3:]
