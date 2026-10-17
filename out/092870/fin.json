@@ -9,7 +9,7 @@
     "latest_report_nm": "반기보고서 (2026.06)",
     "latest_rcept_no": "20260814001521",
     "latest_rcept_dt": "20260814",
-    "generated_at": "2026-10-17T04:44:55"
+    "generated_at": "2026-10-17T04:59:27"
   },
   "fin": {
     "basis": "연결",
@@ -6736,7 +6736,128 @@
       ]
     },
     "capex_notices": [],
-    "region_hist": [],
+    "region_hist": [
+      {
+        "key": "2021.09",
+        "kind": "분기",
+        "dom": 29449000000.0,
+        "exp": 6439000000.0
+      },
+      {
+        "key": "2021.12",
+        "kind": "사업",
+        "dom": 57353000000.0,
+        "exp": 8833000000.0
+      },
+      {
+        "key": "2022.03",
+        "kind": "분기",
+        "dom": 10650000000.0,
+        "exp": 399000000.0
+      },
+      {
+        "key": "2022.06",
+        "kind": "반기",
+        "dom": 27657000000.0,
+        "exp": 648000000.0
+      },
+      {
+        "key": "2022.09",
+        "kind": "분기",
+        "dom": 54197000000.0,
+        "exp": 951000000.0
+      },
+      {
+        "key": "2022.12",
+        "kind": "사업",
+        "dom": 89908000000.0,
+        "exp": 1249000000.0
+      },
+      {
+        "key": "2023.03",
+        "kind": "분기",
+        "dom": 23364000000.0,
+        "exp": 207000000.0
+      },
+      {
+        "key": "2023.06",
+        "kind": "반기",
+        "dom": 53601000000.0,
+        "exp": 326000000.0
+      },
+      {
+        "key": "2023.09",
+        "kind": "분기",
+        "dom": 70307000000.0,
+        "exp": 888000000.0
+      },
+      {
+        "key": "2023.12",
+        "kind": "사업",
+        "dom": 78372000000.0,
+        "exp": 3924000000.0
+      },
+      {
+        "key": "2024.03",
+        "kind": "분기",
+        "dom": 6750000000.0,
+        "exp": 395000000.0
+      },
+      {
+        "key": "2024.06",
+        "kind": "반기",
+        "dom": 13630000000.0,
+        "exp": 1244000000.0
+      },
+      {
+        "key": "2024.09",
+        "kind": "분기",
+        "dom": 15022000000.0,
+        "exp": 3740000000.0
+      },
+      {
+        "key": "2024.12",
+        "kind": "사업",
+        "dom": 26514000000.0,
+        "exp": 5097000000.0
+      },
+      {
+        "key": "2025.03",
+        "kind": "분기",
+        "dom": 1618000000.0,
+        "exp": 297000000.0
+      },
+      {
+        "key": "2025.06",
+        "kind": "반기",
+        "dom": 8816000000.0,
+        "exp": 667000000.0
+      },
+      {
+        "key": "2025.09",
+        "kind": "분기",
+        "dom": 19822000000.0,
+        "exp": 1072000000.0
+      },
+      {
+        "key": "2025.12",
+        "kind": "사업",
+        "dom": 58933000000.0,
+        "exp": 7093000000.0
+      },
+      {
+        "key": "2026.03",
+        "kind": "분기",
+        "dom": 9445000000.0,
+        "exp": 360000000.0
+      },
+      {
+        "key": "2026.06",
+        "kind": "반기",
+        "dom": 39189000000.0,
+        "exp": 2085000000.0
+      }
+    ],
     "capa_hist": [
       {
         "key": "2021.09",
@@ -7046,49 +7167,49 @@
         "contracts": [
           {
             "date": "2022-03-18",
-            "cur": "USD",
+            "cur": "",
             "total": 31559.0,
             "deliv": 31559.0,
             "backlog": null
           },
           {
             "date": "2022-03-31",
-            "cur": "USD",
+            "cur": "",
             "total": 10391.0,
             "deliv": 4450.0,
             "backlog": 5941.0
           },
           {
             "date": "2022-06-09",
-            "cur": "USD",
+            "cur": "",
             "total": 53169.0,
             "deliv": 36685.0,
             "backlog": 19484.0
           },
           {
             "date": "2022-07-14",
-            "cur": "USD",
+            "cur": "",
             "total": 3503.0,
             "deliv": 3503.0,
             "backlog": null
           },
           {
             "date": "2022-10-17",
-            "cur": "USD",
+            "cur": "",
             "total": 13500.0,
             "deliv": null,
             "backlog": 13500.0
           },
           {
             "date": "2022-10-21",
-            "cur": "USD",
+            "cur": "",
             "total": 6130.0,
             "deliv": null,
             "backlog": 6130.0
           },
           {
             "date": "2022-12-05",
-            "cur": "USD",
+            "cur": "",
             "total": 5711.0,
             "deliv": null,
             "backlog": 5711.0
@@ -7111,49 +7232,49 @@
         "contracts": [
           {
             "date": "2022-03-18",
-            "cur": "USD",
+            "cur": "",
             "total": 31559.0,
             "deliv": 31559.0,
             "backlog": 0.0
           },
           {
             "date": "2022-03-31",
-            "cur": "USD",
+            "cur": "",
             "total": 10391.0,
             "deliv": 10391.0,
             "backlog": 0.0
           },
           {
             "date": "2022-06-09",
-            "cur": "USD",
+            "cur": "",
             "total": 53170.0,
             "deliv": 47181.0,
             "backlog": 5989.0
           },
           {
             "date": "2022-07-14",
-            "cur": "USD",
+            "cur": "",
             "total": 3503.0,
             "deliv": 3503.0,
             "backlog": 0.0
           },
           {
             "date": "2022-10-17",
-            "cur": "USD",
+            "cur": "",
             "total": 13500.0,
             "deliv": null,
             "backlog": 13500.0
           },
           {
             "date": "2022-10-21",
-            "cur": "USD",
+            "cur": "",
             "total": 6130.0,
             "deliv": null,
             "backlog": 6130.0
           },
           {
             "date": "2022-12-05",
-            "cur": "USD",
+            "cur": "",
             "total": 5711.0,
             "deliv": null,
             "backlog": 5711.0
@@ -7176,42 +7297,42 @@
         "contracts": [
           {
             "date": "2022-06-09",
-            "cur": "USD",
+            "cur": "",
             "total": 53170.0,
             "deliv": 48701.0,
             "backlog": 4469.0
           },
           {
             "date": "2022-10-17",
-            "cur": "USD",
+            "cur": "",
             "total": 13500.0,
             "deliv": 11370.0,
             "backlog": 2130.0
           },
           {
             "date": "2022-10-21",
-            "cur": "USD",
+            "cur": "",
             "total": 6130.0,
             "deliv": 6130.0,
             "backlog": 0.0
           },
           {
             "date": "2022-12-05",
-            "cur": "USD",
+            "cur": "",
             "total": 5711.0,
             "deliv": 1719.0,
             "backlog": 3992.0
           },
           {
             "date": "2023-06-12",
-            "cur": "USD",
+            "cur": "",
             "total": 7140.0,
             "deliv": 0.0,
             "backlog": 7140.0
           },
           {
             "date": "2023-07-04",
-            "cur": "USD",
+            "cur": "",
             "total": 5425.0,
             "deliv": 0.0,
             "backlog": 5425.0
@@ -7233,21 +7354,21 @@
         "contracts": [
           {
             "date": "2022-10-17",
-            "cur": "USD",
+            "cur": "",
             "total": 13500.0,
             "deliv": 12790.0,
             "backlog": 710.0
           },
           {
             "date": "2022-12-05",
-            "cur": "USD",
+            "cur": "",
             "total": 5711.0,
             "deliv": 1719.0,
             "backlog": 3992.0
           },
           {
             "date": "2022-07-04",
-            "cur": "USD",
+            "cur": "",
             "total": 5425.0,
             "deliv": null,
             "backlog": 5425.0
@@ -7268,7 +7389,7 @@
         "contracts": [
           {
             "date": "2023-07-04",
-            "cur": "USD",
+            "cur": "",
             "total": 5425.0,
             "deliv": 2040.0,
             "backlog": 3385.0
@@ -7289,14 +7410,14 @@
         "contracts": [
           {
             "date": "2023-07-04",
-            "cur": "USD",
+            "cur": "",
             "total": 5425.0,
             "deliv": 3925.0,
             "backlog": 1500.0
           },
           {
             "date": "2024-04-30",
-            "cur": "USD",
+            "cur": "",
             "total": 4370.0,
             "deliv": null,
             "backlog": 4370.0
@@ -7317,7 +7438,7 @@
         "contracts": [
           {
             "date": "2024-05-02",
-            "cur": "USD",
+            "cur": "",
             "total": 4370.0,
             "deliv": null,
             "backlog": 4370.0
@@ -7339,21 +7460,21 @@
         "contracts": [
           {
             "date": "2024-12-20",
-            "cur": "USD",
+            "cur": "",
             "total": 3382.0,
             "deliv": null,
             "backlog": 3382.0
           },
           {
             "date": "2025-04-13",
-            "cur": "USD",
+            "cur": "",
             "total": 1966.0,
             "deliv": null,
             "backlog": 1966.0
           },
           {
             "date": "2025-04-23",
-            "cur": "USD",
+            "cur": "",
             "total": 2430.0,
             "deliv": null,
             "backlog": 2430.0
@@ -7374,7 +7495,7 @@
         "contracts": [
           {
             "date": "2025-06-11",
-            "cur": "USD",
+            "cur": "",
             "total": 19654.0,
             "deliv": 8000.0,
             "backlog": 11654.0
@@ -7397,21 +7518,21 @@
         "contracts": [
           {
             "date": "2025-06-11",
-            "cur": "USD",
+            "cur": "",
             "total": 19654.0,
             "deliv": 19654.0,
             "backlog": null
           },
           {
             "date": "2025-09-22",
-            "cur": "USD",
+            "cur": "",
             "total": 8805.0,
             "deliv": null,
             "backlog": 8805.0
           },
           {
             "date": "2025-10-23",
-            "cur": "USD",
+            "cur": "",
             "total": 20410.0,
             "deliv": null,
             "backlog": 20410.0
@@ -7434,21 +7555,21 @@
         "contracts": [
           {
             "date": "2025-05-26",
-            "cur": "USD",
+            "cur": "",
             "total": 19654.0,
             "deliv": 19654.0,
             "backlog": null
           },
           {
             "date": "2025-09-22",
-            "cur": "USD",
+            "cur": "",
             "total": 8805.0,
             "deliv": 4693.0,
             "backlog": 4112.0
           },
           {
             "date": "2025-10-23",
-            "cur": "USD",
+            "cur": "",
             "total": 20410.0,
             "deliv": 20410.0,
             "backlog": null
@@ -7470,14 +7591,14 @@
         "contracts": [
           {
             "date": "2026-02-27",
-            "cur": "USD",
+            "cur": "",
             "total": 30200.0,
             "deliv": 8000.0,
             "backlog": 22200.0
           },
           {
             "date": "2026-05-06",
-            "cur": "USD",
+            "cur": "",
             "total": 9686.0,
             "deliv": null,
             "backlog": 9686.0
@@ -7501,28 +7622,28 @@
         "contracts": [
           {
             "date": "2026-02-27",
-            "cur": "USD",
+            "cur": "",
             "total": 30200.0,
             "deliv": 16000.0,
             "backlog": 14200.0
           },
           {
             "date": "2026-05-06",
-            "cur": "USD",
+            "cur": "",
             "total": 9686.0,
             "deliv": 1203.0,
             "backlog": 8483.0
           },
           {
             "date": "2026-05-26",
-            "cur": "USD",
+            "cur": "",
             "total": 12065.0,
             "deliv": null,
             "backlog": 12065.0
           },
           {
             "date": "2026-07-07",
-            "cur": "USD",
+            "cur": "",
             "total": 49850.0,
             "deliv": null,
             "backlog": 49850.0
@@ -7532,7 +7653,151 @@
         "kind": "반기"
       }
     ],
-    "segments": [],
+    "segments": [
+      {
+        "key": "2022.06",
+        "kind": "반기",
+        "items": {
+          "Memory Tester": 10920000000.0,
+          "Storage Tester": 17385000000.0
+        }
+      },
+      {
+        "key": "2022.09",
+        "kind": "분기",
+        "items": {
+          "Memory Tester": 21853000000.0,
+          "Storage Tester": 33295000000.0
+        }
+      },
+      {
+        "key": "2022.12",
+        "kind": "사업",
+        "items": {
+          "Memory Tester": 39763000000.0,
+          "Storage Tester": 51394000000.0
+        }
+      },
+      {
+        "key": "2023.03",
+        "kind": "분기",
+        "items": {
+          "Memory Tester": 10020000000.0,
+          "SSDTester": 13551000000.0
+        }
+      },
+      {
+        "key": "2023.06",
+        "kind": "반기",
+        "items": {
+          "Memory Tester": 13238000000.0,
+          "SSDTester": 40689000000.0
+        }
+      },
+      {
+        "key": "2023.09",
+        "kind": "분기",
+        "items": {
+          "Memory Tester": 30241000000.0,
+          "SSDTester": 40954000000.0
+        }
+      },
+      {
+        "key": "2023.12",
+        "kind": "사업",
+        "items": {
+          "Memory Tester": 38544000000.0,
+          "SSD Tester": 43752000000.0
+        }
+      },
+      {
+        "key": "2024.03",
+        "kind": "분기",
+        "items": {
+          "Memory Tester": 2891000000.0,
+          "SSD Tester": 4254000000.0
+        }
+      },
+      {
+        "key": "2024.06",
+        "kind": "반기",
+        "items": {
+          "Memory Tester": 4706000000.0,
+          "SSD Tester": 8048000000.0,
+          "SoC Tester": 2120000000.0
+        }
+      },
+      {
+        "key": "2024.09",
+        "kind": "분기",
+        "items": {
+          "Memory Tester": 6223000000.0,
+          "SSD Tester": 10419000000.0,
+          "SoC Tester": 2120000000.0
+        }
+      },
+      {
+        "key": "2024.12",
+        "kind": "사업",
+        "items": {
+          "Memory Tester": 12117000000.0,
+          "SSD Tester": 16246000000.0,
+          "SoC Tester": 3248000000.0
+        }
+      },
+      {
+        "key": "2025.03",
+        "kind": "분기",
+        "items": {
+          "Memory Tester": 1376000000.0,
+          "SSD Tester": 539000000.0
+        }
+      },
+      {
+        "key": "2025.06",
+        "kind": "반기",
+        "items": {
+          "Memory Tester": 8585000000.0,
+          "SSD Tester": 896000000.0,
+          "SoC Tester": 2000000.0
+        }
+      },
+      {
+        "key": "2025.09",
+        "kind": "분기",
+        "items": {
+          "Memory Tester": 19329000000.0,
+          "SSD Tester": 1563000000.0,
+          "SoC Tester": 2000000.0
+        }
+      },
+      {
+        "key": "2025.12",
+        "kind": "사업",
+        "items": {
+          "Memory Tester": 58423000000.0,
+          "SSD Tester": 6443000000.0,
+          "SoC Tester": 1160000000.0
+        }
+      },
+      {
+        "key": "2026.03",
+        "kind": "분기",
+        "items": {
+          "Memory Tester": 9104000000.0,
+          "SSD Tester": 699000000.0,
+          "SoC Tester": 2000000.0
+        }
+      },
+      {
+        "key": "2026.06",
+        "kind": "반기",
+        "items": {
+          "Memory Tester": 37600000000.0,
+          "SSD Tester": 3674000000.0
+        }
+      }
+    ],
     "insider": [
       {
         "dt": "2026-08-04",
