@@ -471,6 +471,22 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       "<div class='charts'>" + costStack("비용 구성", "분기 · 억원", lastN(q.labels, 12), lastN(q.매출원가, 12), lastN(q.판관비, 12), lastN(q.영업이익, 12)) +
       lineMulti("마진 추이", "분기 · 매출 대비", q.labels, [{ n: "매출총이익률", c: "var(--s3)", v: gm }, { n: "영업이익률", c: "var(--s1)", v: qv }, { n: "순이익률", c: "var(--s2)", v: nm }]) + "</div>");
 
+    window.cmFill = function (m) {
+      var b = window.__cmBt; if (!b) return;
+      var q = document.getElementById("cmIn"), md = document.getElementById("cmMode");
+      if (m === 1) { md.value = "q"; q.value = Math.round(b.rbase); } else { md.value = "y"; q.value = Math.round(b.rbase * 4); }
+      window.cmCalc();
+    };
+    window.cmCalc = function () {
+      var b = window.__cmBt, o = document.getElementById("cmOut"); if (!b || !o) return;
+      var v = parseFloat(document.getElementById("cmIn").value), y = document.getElementById("cmMode").value === "y";
+      if (!isFinite(v) || v <= 0) { o.textContent = "매출을 입력하면 영업이익을 계산합니다."; return; }
+      var sq = y ? v / 4 : v, k = y ? 4 : 1, u = y ? "연간" : "분기";
+      var a1 = (b.cm4 * sq - b.fx4) * k, a2 = (b.a * sq + b.b) * k;
+      var f = function (x) { return (Math.round(x * 10) / 10).toLocaleString("ko-KR"); };
+      var lo = Math.min(a1, a2), hi = Math.max(a1, a2);
+      o.innerHTML = u + " 매출 <b>" + f(v) + "억</b> → 영업이익 공헌이익 모델 <b>" + f(a1) + "억</b>(OPM " + f(a1 / (sq * k) * 100) + "%), 회귀 <b>" + f(a2) + "억</b>(OPM " + f(a2 / (sq * k) * 100) + "%). 범위 " + f(lo) + "~" + f(hi) + "억." + (b.good ? "" : " ※ 이 종목은 신뢰도가 낮습니다.") + " 최근 4분기 평균 분기 매출 " + f(b.rbase) + "억 기준 고정비·공헌이익률을 사용합니다.";
+    };
     function cmBt(cc) {
       var b = cc.bt;
       if (!b) return "";
@@ -479,6 +495,8 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       var t = "<h3>공헌이익 모델 검증 " + badge + "</h3><div class='meta'>분기 영업이익 = 공헌이익률 × 매출 − 고정비. 과거 " + b.n + "분기(" + esc(b.labels[0]) + "~" + esc(b.labels[b.labels.length - 1]) + ")를 회귀하면 기울기(실제 공헌이익률) <b>" + pct(b.a * 100) + "</b>, 고정비 <b>" + n0(-b.b) + "억/분기</b>, 설명력 R² <b>" + b.r2.toFixed(2) + "</b>입니다. 비용 분류로 구한 최근 4분기 공헌이익률은 <b>" + pct(b.cm4 * 100) + "</b>, 고정비(준변동 " + Math.round(cc.semi * 100) + "% 포함) 분기 " + n0(b.fx4) + "억입니다. " + (Math.abs(b.a - b.cm4) > 0.15 ? "두 값이 " + Math.round(Math.abs(b.a - b.cm4) * 100) + "%p 차이 나므로 매출에 연동되는 비용을 고정비로 분류했거나 고정비가 시간에 따라 올랐을 수 있습니다. 시나리오는 두 방식을 모두 보고 범위로 읽으세요." : "두 값이 비슷해 분류가 실제 비용 움직임과 맞습니다.") + "</div>";
       t += "<div class='scroll'><table><thead><tr><th>한 분기 앞 영업이익 예측 오차(억, 작을수록 좋음)</th><th class='n'>공헌이익 모델</th><th class='n'>회귀</th><th class='n'>OPM 유지</th></tr></thead><tbody><tr><td>평균 절대오차 (실제 매출을 넣었을 때)</td><td class='n'>" + f1(b.mae.cm) + "</td><td class='n'>" + f1(b.mae.reg) + "</td><td class='n'>" + f1(b.mae.opm) + "</td></tr></tbody></table></div>";
       t += "<div class='scroll'><table><thead><tr><th>최근 분기</th><th class='n'>매출</th><th class='n'>실제 영업이익</th><th class='n'>공헌이익 모델</th><th class='n'>회귀</th><th class='n'>OPM 유지</th></tr></thead><tbody>" + b.last.map(function (r) { return "<tr><td>" + esc(r.l) + "</td><td class='n'>" + n0(r.r) + "</td><td class='n'>" + f1(r.op) + "</td><td class='n'>" + f1(r.cm) + "</td><td class='n'>" + f1(r.reg) + "</td><td class='n'>" + f1(r.opm) + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      window.__cmBt = b;
+      t += "<div class='meta'><b>내 매출로 계산</b> &nbsp;<input id='cmIn' type='number' inputmode='decimal' placeholder='매출(억원)' style='width:7em;padding:4px 6px;border:1px solid var(--line,#ccc);border-radius:6px;background:transparent;color:inherit' oninput='cmCalc()'> 억원 &nbsp;<select id='cmMode' onchange='cmCalc()' style='padding:4px;border:1px solid var(--line,#ccc);border-radius:6px;background:transparent;color:inherit'><option value='q'>분기 매출</option><option value='y'>연간 매출(÷4)</option></select> &nbsp;<a href='#' onclick='cmFill(1);return false'>최근 4분기 평균</a> · <a href='#' onclick='cmFill(2);return false'>1년치(×4)</a></div><div class='meta' id='cmOut'>매출을 입력하면 영업이익을 계산합니다.</div>";
       t += "<div class='scroll'><table><thead><tr><th>매출 시나리오 (최근 4분기 평균 분기 " + n0(b.rbase) + "억 기준)</th><th class='n'>분기 매출</th><th class='n'>영업이익(공헌이익 모델)</th><th class='n'>영업이익(회귀)</th></tr></thead><tbody>" + b.scen.map(function (r) { return "<tr><td>" + (r.x > 0 ? "+" : "") + Math.round(r.x * 100) + "%</td><td class='n'>" + n0(r.rev) + "</td><td class='n'>" + f1(r.cm) + "</td><td class='n'>" + f1(r.reg) + "</td></tr>"; }).join("") + "</tbody></table></div>";
       t += "<div class='meta'>" + (b.good ? "예측 오차가 'OPM 유지'보다 작고 평균 영업이익 대비 " + pct(b.rel * 100, 0) + " 수준입니다." : "R² 0.5 미만이거나, 오차가 'OPM 유지'보다 크거나, 평균 영업이익 대비 오차가 50% 이상이라 신뢰도가 낮습니다(평균 영업이익 대비 오차 " + (ok(b.rel) ? pct(b.rel * 100, 0) : "-") + ").") + " 한 분기 앞의 단기 민감도 용도이며, 고정비는 설비·인력 증설 때 계단식으로 오르고 제품 믹스가 바뀌면 공헌이익률도 달라지므로 먼 미래 전망에는 쓰지 않습니다.</div>";
       return t;
