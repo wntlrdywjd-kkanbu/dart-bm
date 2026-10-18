@@ -25,12 +25,18 @@ def parse_table(t):
     unit_known = bool(mu)
     quarterly = any("3개월" in r for r in rows[:3])
     q, cum, total = {}, {}, None
+    total_first = None
     for r in rows:
         cells = [x.strip() for x in r.strip().strip("|").split("|")]
         if len(cells) < 2:
             continue
         name = cells[0]
         vals = [_n(c) for c in cells[1:]]
+        # '성격별 비용 합계 | 제품과 재공품의 감소(증가) | 값' 처럼 앞 칸이 합계 라벨을 반복하는 행: 둘째 칸을 계정명으로
+        if (name and vals and vals[0] is None and len(cells) > 2 and _n(cells[2]) is not None
+                and re.sub(r"\s", "", name).endswith("합계") and cells[1]):
+            name = cells[1]
+            vals = [_n(c) for c in cells[2:]]
         if not name or vals[0] is None or name in ("구분", "구 분"):
             continue
         nn = re.sub(r"\(\*+\d*\)", "", re.sub(r"\s", "", name))
@@ -42,10 +48,18 @@ def parse_table(t):
         else:
             a = b = vals[0] * mult
         if is_tot:
+            if not q:  # 합계 행이 맨 위에 있는 표(서진시스템): 합계를 기억하고 항목을 계속 읽는다
+                total_first = (a, b)
+                continue
             total = (a, b)
             break  # 첫 합계에서 종료(연결 표 하나만)
         q[name] = q.get(name, 0.0) + a
         cum[name] = cum.get(name, 0.0) + b
+    if total is None and total_first is not None and len(q) >= 4:
+        # 합계 선행 표는 항목 합이 합계와 2% 이내일 때만 인정
+        sa, sb = sum(q.values()), sum(cum.values())
+        if abs(sa - total_first[0]) <= 0.02 * abs(total_first[0]) and abs(sb - total_first[1]) <= 0.02 * abs(total_first[1]):
+            total = total_first
     if total is None or len(q) < 4:
         return None
     return {"q": q, "cum": cum, "total": total, "quarterly": quarterly, "unit_known": unit_known}

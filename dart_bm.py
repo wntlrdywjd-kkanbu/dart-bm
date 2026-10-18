@@ -265,6 +265,17 @@ def pick_fin(rows):
             if not found:
                 names = [r.get("account_nm") for r in rows if r.get("sj_div") in divs][:12]
                 print(f"[경고] 매출액 계정 못 찾음. IS 계정 후보: {names}", file=sys.stderr)
+        if not found and label == "당기순이익":  # 계정명이 표준과 다른 보고서(서진시스템 2026.06 등): '순이익/순손익' 계열 IS 행으로 대체
+            for r in rows:
+                nm = norm(r.get("account_nm"))
+                if r.get("sj_div") in divs and re.search(r"순(이익|손익|손실)", nm) and not re.search(r"포괄|지배|비지배|주당|법인|세전|계속영업|중단|기타|총|조정", nm):
+                    found = {"당기": to_int(r.get("thstrm_amount")), "전기": to_int(r.get("frmtrm_amount")),
+                             "당기누적": to_int(r.get("thstrm_add_amount")), "전기누적": to_int(r.get("frmtrm_add_amount")),
+                             "전전기": to_int(r.get("bfefrmtrm_amount")), "account_nm": r.get("account_nm")}
+                    break
+            if not found:
+                names = [r.get("account_nm") for r in rows if r.get("sj_div") in divs and "순" in (r.get("account_nm") or "")][:12]
+                print(f"[경고] 당기순이익 계정 못 찾음. 후보: {names}", file=sys.stderr)
         out[label] = found
     out["_cf"] = [[r.get("account_nm"), to_int(r.get("thstrm_amount"))] for r in rows if r.get("sj_div") == "CF"]  # 현금흐름표 원 행(워터폴용)
     return out
@@ -598,8 +609,54 @@ def _seg_wide(lines):
     return None
 
 
+def _seg_rowspan(lines):
+    """'매출유형 | 품목 | 주요 제품 | 20XX년 ... / 매출액 | 비중 ...' 2단 헤더 + 앞칸 병합(행마다 칸 수 다름) 표(서진시스템).
+    값은 행 오른쪽 끝에서 (금액, 비중) 쌍으로 읽고, 이름은 헤더의 '품목' 칸 위치로 보정. 합계와 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or "품목" not in ln or "주요" not in ln or i + 2 >= len(lines):
+            continue
+        hdr = [c.strip() for c in ln.strip().strip("|").split("|")]
+        ip = next((x for x, h in enumerate(hdr) if h.replace(" ", "") == "품목"), None)
+        iy = next((x + 1 for x, h in enumerate(hdr) if h.replace(" ", "").startswith("주요제품")), None)  # 기간 열 시작(라벨 칸 수)
+        if ip is None or iy is None or iy < 2 or ip >= iy:
+            continue
+        sub = [c.strip() for c in lines[i + 1].strip().strip("|").split("|")]
+        if not sub or sub[0] != "매출액" or "비중" not in sub[1:2] + sub[-1:]:
+            continue
+        ny = len(sub) // 2  # 연도 수
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, k = {}, None, i + 2
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            if len(c) < 2 * ny + 1:
+                continue
+            vals = c[len(c) - 2 * ny:]
+            amt = _num(vals[0])
+            labels = c[:len(c) - 2 * ny]
+            nm0 = labels[0].replace(" ", "")
+            if nm0 in ("합계", "계", "총계"):
+                total = amt
+                continue
+            if amt is None or not labels:
+                continue
+            j = ip - (iy - len(labels))  # 앞칸 병합으로 빠진 칸 수만큼 당김
+            if j < 0 or j >= len(labels):
+                continue
+            nm = labels[j].strip()
+            if not nm or nm in ("-", "별첨"):
+                continue
+            items[nm] = items.get(nm, 0) + amt
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k2: v * mult for k2, v in items.items()}
+    return None
+
+
 def seg_from_lines(lines):
-    r = _seg_main(lines)
+    r = _seg_rowspan(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
     return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines)
