@@ -25,6 +25,59 @@ def nseg(n):
     return re.sub(r"\s+", "", (n or "").replace("&cr", "")).replace("부분", "부문")
 
 
+def cm_backtest(cc):
+    """공헌이익 모델 검증: 분기 영업이익 = a×매출 − F 회귀 + 한 분기 앞 예측 오차 비교 + 매출 시나리오."""
+    sm = cc.get("semi", 0.5)
+    ix = [i for i in range(len(cc["labels"])) if all(cc[k][i] is not None for k in ("R", "V", "S", "F"))]
+    if len(ix) < 8:
+        return None
+    L = [cc["labels"][i] for i in ix]
+    R, V, S, F = ([float(cc[k][i]) for i in ix] for k in ("R", "V", "S", "F"))
+    OP = [r - v - s_ - f for r, v, s_, f in zip(R, V, S, F)]
+    n = len(R)
+
+    def fit(x, y):
+        mx, my = sum(x) / len(x), sum(y) / len(y)
+        sxx = sum((a - mx) ** 2 for a in x)
+        if sxx == 0:
+            return None
+        a = sum((p - mx) * (q - my) for p, q in zip(x, y)) / sxx
+        return a, my - a * mx
+    ab = fit(R, OP)
+    if not ab:
+        return None
+    a, b = ab
+    sst = sum((y - sum(OP) / n) ** 2 for y in OP)
+    r2 = 1 - sum((y - (a * x + b)) ** 2 for x, y in zip(R, OP)) / sst if sst else 0
+    err = {"cm": [], "reg": [], "opm": []}
+    last = []
+    for t in range(6, n):
+        lo = max(0, t - 8)
+        ab_ = fit(R[lo:t], OP[lo:t])
+        k = range(max(0, t - 4), t)
+        rs = sum(R[j] for j in k)
+        cm = (rs - sum(V[j] for j in k) - sm * sum(S[j] for j in k)) / rs
+        fx = sum(F[j] + sm * S[j] for j in k) / len(k)
+        p = {"cm": cm * R[t] - fx, "opm": sum(OP[j] for j in k) / rs * R[t]}
+        if ab_:
+            p["reg"] = ab_[0] * R[t] + ab_[1]
+        for nm in err:
+            if nm in p:
+                err[nm].append(abs(p[nm] - OP[t]))
+        last.append({"l": L[t], "r": R[t], "op": OP[t], "cm": p["cm"], "reg": p.get("reg"), "opm": p["opm"]})
+    m = {k: (sum(v) / len(v) if v else None) for k, v in err.items()}
+    k4 = range(n - 4, n)
+    rs = sum(R[j] for j in k4)
+    cm4 = (rs - sum(V[j] for j in k4) - sm * sum(S[j] for j in k4)) / rs
+    fx4 = sum(F[j] + sm * S[j] for j in k4) / 4
+    rb = rs / 4
+    sc = [{"x": x, "rev": rb * (1 + x), "cm": cm4 * rb * (1 + x) - fx4, "reg": a * rb * (1 + x) + b} for x in (-0.2, -0.1, 0, 0.1, 0.2)]
+    mabs = sum(abs(y) for y in OP[6:]) / max(1, n - 6)
+    rel = m["cm"] / mabs if (m["cm"] is not None and mabs) else None
+    good = bool(r2 >= 0.5 and rel is not None and rel < 0.5 and m["opm"] is not None and m["cm"] < m["opm"])
+    return {"rel": rel, "mabs": mabs, "labels": L, "a": a, "b": b, "r2": r2, "cm4": cm4, "fx4": fx4, "rbase": rb, "mae": m, "last": last[-4:], "scen": sc, "good": good, "n": n}
+
+
 def ttm(vals, i):
     w = vals[i - 3:i + 1] if i >= 3 else []
     return sum(w) if len(w) == 4 and all(v is not None for v in w) else None
@@ -272,6 +325,10 @@ def extra(base, meta, fin):
             pass
         cc = costcalc.build(rep, q20, nt_.get("cost_map"), nt_.get("semi_var_ratio", 0.5)) if rep else None
         if cc:
+            try:
+                cc["bt"] = cm_backtest(cc)
+            except Exception as e:
+                print("[경고] 공헌이익 검증 계산 실패:", e)
             ex["cost"] = cc
     except Exception as e:
         print("[경고] 비용 구조 계산 실패:", e)
