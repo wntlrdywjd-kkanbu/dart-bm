@@ -716,8 +716,40 @@ def _seg_division(lines):
     return None
 
 
+def _seg_subtotal(lines):
+    """헤더 '구 분 | 매출유형 | 품목 | 구체적 용도 | 주요상표등 | 제N기 …'(구분 칸이 첫 행에만 있고 부문마다 '소 계' 행이 있는 표; 리노공업).
+    열 수가 가장 많은 행(구분 칸 있음)의 첫 칸을 부문명으로, 부문별 '소 계'(당기 첫 숫자)를 금액으로 읽는다. 합계와 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        h = ln.replace(" ", "")
+        if not ln.startswith("|") or "구분" not in h or "매출유형" not in h or "품목" not in h or "구체적용도" not in h:
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        rows, k = [], i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            rows.append([x.strip() for x in lines[k].strip().strip("|").split("|")])
+            k += 1
+        full = max((len(c) for c in rows), default=0)
+        names, subs, total = [], [], None
+        for c in rows:
+            c0 = re.sub(r"\s+", "", c[0]) if c else ""
+            nums = [x for x in c[1:] if re.fullmatch(r"-?[\d,]+", x)]
+            if c0 in ("합계", "계", "총계") and nums:
+                total = float(nums[0].replace(",", ""))
+            elif c0 == "소계" and nums:
+                subs.append(float(nums[0].replace(",", "")))
+            elif len(c) >= full and c[0] and not re.fullmatch(r"[\d,.\-]+", c[0]):
+                names.append(c[0])
+        if len(names) >= 2 and len(names) == len(subs) and total and abs(sum(subs) - total) <= total * 0.03:
+            return {n: v * mult for n, v in zip(names, subs)}
+        return None
+    return None
+
+
 def seg_from_lines(lines):
-    r = _seg_rowspan(lines) or _seg_division(lines) or _seg_main(lines)
+    r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
     return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines)
