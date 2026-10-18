@@ -557,7 +557,7 @@ def _seg_types(lines):
         while k < len(lines) and lines[k].startswith("|"):
             c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
             k += 1
-            p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+(\([\d.]+%\))?", v)), None)  # '181,084(20.24%)' 처럼 비율이 붙은 칸(동국제약)도 금액으로
+            p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+(\s*\([\d.]+\s*%?\))?", v)), None)  # '181,084(20.24%)' 처럼 비율이 붙은 칸(동국제약)도 금액으로
             if p is None:
                 continue
             q_ = p - 1
