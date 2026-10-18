@@ -655,8 +655,69 @@ def _seg_rowspan(lines):
     return None
 
 
+def _seg_division(lines):
+    """'사업부문 | 회사명 | 매출유형 | 품목 | 구분(수출/내수/소계) | 당기 | 전기 ...' 매출실적 표(아모텍): 부문(…부문)별로
+    매출유형 묶음마다 '소계' 행을 쓰고(없으면 수출+내수 합), 부문 합계를 낸다. 합계 행과 3% 이내이고 부문 2개 이상일 때만."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or "사업부문" not in ln or "매출유형" not in ln or "구분" not in ln:
+            continue
+        hdr = [c.strip() for c in ln.strip().strip("|").split("|")]
+        ig = next((x for x, h in enumerate(hdr) if h.replace(" ", "") == "구분"), None)
+        if ig is None or len(hdr) - ig - 1 < 1:
+            continue
+        npd = len(hdr) - ig - 1
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        divs, order, cur, grp, total, in_total = {}, [], None, None, None, False
+
+        def flush():
+            if cur is not None and grp is not None:
+                divs[cur] += grp["sub"] if grp["sub"] is not None else grp["sum"]
+        k = i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            if len(c) < npd + 1:
+                continue
+            gu = c[-npd - 1].replace(" ", "")
+            v = _num(c[-npd])
+            labels = c[:-npd - 1]
+            if c[0].replace(" ", "") in ("합계", "계", "총계"):  # '합 계 | 수출 | …' 다음의 '소계' 행이 총합
+                in_total = True
+                continue
+            if gu not in ("수출", "내수", "소계"):
+                continue
+            if v is None:
+                continue
+            if in_total:
+                if gu == "소계":
+                    total = v
+                    break
+                continue
+            if len(labels) >= 3 and labels[0].endswith("부문"):
+                flush(); grp = None
+                cur = re.sub(r"\s+", " ", labels[0]).strip()
+                if cur not in divs:
+                    divs[cur] = 0.0; order.append(cur)
+                grp = {"sub": None, "sum": 0.0}
+            elif len(labels) >= 1 and cur is not None:
+                flush(); grp = {"sub": None, "sum": 0.0}
+            if cur is None or grp is None:
+                continue
+            if gu == "소계":
+                grp["sub"] = v
+            else:
+                grp["sum"] += v
+        flush()
+        if len(divs) >= 2 and total and abs(sum(divs.values()) - total) <= total * 0.03:
+            return {d: divs[d] * mult for d in order if divs[d]}
+    return None
+
+
 def seg_from_lines(lines):
-    r = _seg_rowspan(lines) or _seg_main(lines)
+    r = _seg_rowspan(lines) or _seg_division(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
     return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines)
@@ -892,6 +953,26 @@ def capa_from_lines(lines):
                 nm = re.sub(r"\(.*", "", re.sub(r"\s+", "", cells[-4]))
                 if nm:
                     groups[nm] = {"unit": "", "capa": nums[0], "prod": nums[1], "util": nums[2]}
+    if groups:
+        return groups
+    # 형식 2b: 헤더 2단 — '| 사업부문 | 회사명 | 사업소 | 제33기 2분기 |' 아래 '| 가동 가능시간 | 실제 가동시간 | 평균 가동률 |', 행은 부문별(아모텍). 부문명을 그룹명으로
+    for b in blocks:
+        if b["type"] != "table" or len(b["rows"]) < 3:
+            continue
+        r1 = [re.sub(r"\s+", "", x) for x in b["rows"][1].strip().strip("|").split("|")]
+        if len(r1) != 3 or not (re.search(r"가능", r1[0]) and re.search(r"실제", r1[1]) and r1[2] in ("가동률", "가동율", "평균가동률", "평균가동율")):
+            continue
+        for r in b["rows"][2:]:
+            cells = [x.strip() for x in r.strip().strip("|").split("|")]
+            if len(cells) < 5 or not cells[0] or re.sub(r"\s+", "", cells[0]).startswith(("합계", "계")):
+                continue
+            nums = []
+            for c in cells[-3:]:
+                m2 = re.match(r"^-?[\d,]+(\.\d+)?", c.replace(" ", ""))
+                nums.append(float(m2.group(0).replace(",", "")) if m2 else None)
+            if None in nums:
+                continue
+            groups[re.sub(r"\s+", "", cells[0])] = {"unit": "시간", "capa": nums[0], "prod": nums[1], "util": nums[2]}
     if groups:
         return groups
     # 형식 3: '| 사업부문 | 품목 | 당기 | 전기 | 전전기 |' 아래 '| 가동률 | 가동률 | 가동률 |' 줄만 있고 품목별 가동률(%)만 적은 표(상신이디피)
