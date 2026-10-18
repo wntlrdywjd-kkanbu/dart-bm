@@ -832,6 +832,21 @@ def capa_from_lines(lines):
                     groups[nm] = {"unit": "", "capa": nums[0], "prod": nums[1], "util": nums[2]}
     if groups:
         return groups
+    # 형식 3: '| 사업부문 | 품목 | 당기 | 전기 | 전전기 |' 아래 '| 가동률 | 가동률 | 가동률 |' 줄만 있고 품목별 가동률(%)만 적은 표(상신이디피)
+    for b in blocks:
+        if b["type"] != "table" or len(b["rows"]) < 3:
+            continue
+        r1 = [re.sub(r"\s+", "", x) for x in b["rows"][1].strip().strip("|").split("|")]
+        if not r1 or not all(x in ("가동률", "가동율") for x in r1):
+            continue
+        for r in b["rows"][2:]:
+            cells = [x.strip() for x in r.strip().strip("|").split("|")]
+            p = next((x for x, c in enumerate(cells) if x > 0 and re.fullmatch(r"-?[\d,.]+\s*%?", c)), None)
+            if p is None or not cells[p - 1]:
+                continue
+            groups[re.sub(r"\s+", "", cells[p - 1])] = {"unit": "%", "util": float(cells[p].replace(",", "").replace("%", "").strip())}
+    if groups:
+        return groups
     for b in blocks:
         if b["type"] != "table":
             continue
