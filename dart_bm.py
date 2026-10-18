@@ -553,11 +553,11 @@ def _seg_types(lines):
         if "품목" in hc and any(x.startswith("주요상표") for x in hc) and hc.index("품목") < len(hc) - 1:
             ix_ = [j for j, x in enumerate(hc) if x.startswith("주요상표")][0]
             trail = ix_ - hc.index("품목")  # 품목 뒤에 오는 라벨 칸 수(구체적 용도 + 주요상표)
-        items, total, k = {}, None, i + 1
+        items, total, k, seen_sub = {}, None, i + 1, False
         while k < len(lines) and lines[k].startswith("|"):
             c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
             k += 1
-            p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+", v)), None)
+            p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+(\([\d.]+%\))?", v)), None)  # '181,084(20.24%)' 처럼 비율이 붙은 칸(동국제약)도 금액으로
             if p is None:
                 continue
             q_ = p - 1
@@ -568,11 +568,15 @@ def _seg_types(lines):
             while q_ > 0 and re.sub(r"\s+", "", c[q_]) in ("별첨", "-", "–", "해당없음", ""):
                 q_ -= 1
             nm = re.sub(r"\s+", "", c[q_])
-            amt = float(c[p].replace(",", ""))
+            amt = float(re.sub(r"\(.*", "", c[p]).replace(",", ""))
             if nm in ("합계", "계", "총계"):
                 total = amt
-            elif nm != "소계":
+            elif nm == "소계":
+                seen_sub = True
+            else:
                 nm = re.sub(r"\(.*", "", c[q_]).strip() or c[q_]
+                if trail and seen_sub and nm in items:  # 소계 뒤에 같은 이름('기타')이 다시 나오는 표(동국제약: 제품 기타 / 매출유형 기타)는 이름을 구분
+                    nm = nm + "(2)"
                 items[nm] = items.get(nm, 0) + amt
         if any(re.sub(r"\s+", "", n_) in ("수출", "내수", "국내", "해외") or "판매" in n_ for n_ in items):
             continue
