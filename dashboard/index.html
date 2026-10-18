@@ -638,7 +638,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     var rp = R.reports, rec = rp.filter(function (r) { return !r.old; }), tps = rec.filter(function (r) { return r.tp; });
     var last = rp[0];
     var hd = tps.length
-      ? esc(rec.length) + "건의 최근 리포트: 목표가 " + tps.slice().reverse().map(function (r) { return r.tp.toLocaleString("ko-KR"); }).filter(function (v, i, arr) { return i === 0 || v !== arr[i - 1]; }).join(" → ") + "원" + ((R.op26 || []).length > 1 ? ", 올해 영업이익 추정은 계속 상향" : "")
+      ? esc(rec.length) + "건의 최근 리포트: 목표가 " + tps.slice().reverse().map(function (r) { return r.tp.toLocaleString("ko-KR"); }).filter(function (v, i, arr) { return i === 0 || v !== arr[i - 1]; }).join(" → ") + "원" + (function () { var o = R.op26 || []; if (o.length < 2) return ""; var a = o[0].v, b = o[o.length - 1].v; return b > a * 1.05 ? ", 올해 영업이익 추정은 계속 상향" : b < a * 0.95 ? ", 올해 영업이익 추정은 계속 하향" : ", 올해 영업이익 추정은 큰 변화 없음"; })()
       : esc(rec.length) + "건의 최근 리포트, 투자의견·목표가를 제시한 곳은 없음(전부 NR)";
     var h = "<section class='card sec' id='research'><div class='q'>증권사 리포트 상세 (비공개 화면)</div><h2 class='vd'>" + hd + "</h2>";
     h += "<div class='kpis'>" + stat("최근 리포트", esc(last.broker), esc(last.date)) + stat("최근 목표가", won(last.tp), last.tp && last.price ? "작성일 주가 대비 " + sgn((last.tp / last.price - 1) * 100) : "") + (tps.length ? stat("최저·최고 목표가", Math.round(Math.min.apply(null, tps.map(function (r) { return r.tp; })) / 1000) + "천 ~ " + Math.round(Math.max.apply(null, tps.map(function (r) { return r.tp; })) / 1000) + "천", "최근 1년 내 리포트") : stat("투자의견 제시", "0건", rec.length + "건 모두 NR")) + "</div>";
