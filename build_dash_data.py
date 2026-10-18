@@ -133,6 +133,17 @@ def extra(base, meta, fin):
     if fin.get("dividend"):
         ex["div"] = fin["dividend"]
     segs = [{**s_, "items": {n: v for n, v in s_["items"].items() if v is not None and v >= 0}} for s_ in (fin.get("segments") or [])]  # 내부거래(-) 제외
+    try:  # notes.seg_alias: 보고서마다 달라진 부문명을 한 이름으로 통합(서진시스템 'ESS 부품'→'ESS 장비')
+        _sa = (json.load(open(os.path.join(base, "notes.json"), encoding="utf-8")) or {}).get("seg_alias") or {}
+    except (OSError, ValueError):
+        _sa = {}
+    if _sa:
+        for s_ in segs:
+            _it = {}
+            for n, v in s_["items"].items():
+                k_ = _sa.get(n, _sa.get(re.sub(r"\s+", " ", n).strip(), n))
+                _it[k_] = _it.get(k_, 0) + v
+            s_["items"] = _it
     if segs:
         names = {}
         for s_ in segs:
