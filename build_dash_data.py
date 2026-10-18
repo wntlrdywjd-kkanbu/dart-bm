@@ -296,11 +296,26 @@ def extra(base, meta, fin):
     # capex (현금흐름표 취득액, 누적 → 분기) + 감가상각 대비, 시설투자 공시, 설비 계획·증가 표
     try:
         pr_ = fin.get("periods_raw") or {}
-        cum = {}
+        cum, split_ = {}, set()
         for k_, it_ in pr_.items():
             rows_ = it_.get("_cf") or []
             a_ = cfrow(rows_, r"^유형자산의?취득$|^유형자산취득$")
             b_ = cfrow(rows_, r"^무형자산의?취득$|^무형자산취득$")
+            if a_ is None and b_ is None:
+                # 자산 종류별로 쪼개 적는 회사(큐알티: 기계장치·건설중인자산·기타유형자산의 취득)는 합산
+                sa_ = sb_ = 0.0
+                hit_ = False
+                for r_ in rows_:
+                    nm_ = re.sub(r"\s+", "", str(r_[0]))
+                    if not isinstance(r_[1], (int, float)):
+                        continue
+                    if re.search(r"(토지|건물|구축물|기계장치|건설중인자산|차량운반구|공구|비품|시설장치|기타유형자산|기타의유형자산)의?취득$", nm_):
+                        sa_ += abs(r_[1]); hit_ = True
+                    elif re.search(r"(소프트웨어|산업재산권|개발비|영업권|회원권|기타무형자산|기타의무형자산)의?취득$", nm_):
+                        sb_ += abs(r_[1]); hit_ = True
+                if hit_:
+                    a_, b_ = sa_, sb_
+                    split_.add(k_)
             if a_ is not None or b_ is not None:
                 cum[k_] = (abs(a_ or 0), abs(b_ or 0))
         cl, cp_, cq_ = [], [], []
@@ -313,6 +328,8 @@ def extra(base, meta, fin):
                 if not pk2:
                     continue
                 q_ = (cum[k_][0] - pk2[0], cum[k_][1] - pk2[1])
+            if k_ in split_ and m_ != 3 and (min(q_) < 0 or sum(q_) == 0):
+                raise ValueError(f"자산별 취득 행의 누적값이 단조롭지 않아 capex 생략({k_})")  # 건설중인자산 대체 등으로 누적이 줄거나 반기 열이 중복된 경우
             cl.append(f"{str(y_)[2:]}.{m_ // 3}Q"); cp_.append((q_[0] + q_[1]) / 1e8); cq_.append(q_[0] / 1e8)
         capx = {"labels": cl, "capex": cp_, "ppe": cq_}
         dep_ = (ex.get("cost") or {})
