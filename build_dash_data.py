@@ -98,6 +98,9 @@ def cfw(items):
     adj = cfrow(rows, r"조정을위한가감|^조정$|^조정항목")
     wc = cfrow(rows, r"자산부채의변동|자산및부채의변동")
     ocf, icf, fcf = g("영업활동현금흐름"), g("투자활동현금흐름"), g("재무활동현금흐름")
+    _n = items.get("당기순이익") or {}
+    if ni is not None and _n.get("당기누적") is not None and ni == _n.get("당기") and ni != _n["당기누적"]:
+        ni = _n["당기누적"]  # 분기·반기 보고서: 현금흐름표 순이익 행이 3개월 열로 읽힌 경우 누적 순이익으로 바로잡는다(영업CF는 누적 기준)
     out = {"기초현금": g("기초현금"), "기말현금": g("기말현금"), "영업": ocf, "투자": icf, "재무": fcf,
            "환율": cfrow(rows, r"^현금및현금성자산에대한환율변동효과")}
     if None not in (ni, adj, wc, ocf):

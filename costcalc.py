@@ -40,7 +40,7 @@ def parse_table(t):
         if not name or vals[0] is None or name in ("구분", "구 분"):
             continue
         nn = re.sub(r"\(\*+\d*\)", "", re.sub(r"\s", "", name))
-        is_tot = nn.startswith(("합계", "계")) or nn.endswith("합계")
+        is_tot = nn.startswith(("합계", "계", "매출원가와판매비", "매출원가및판매비")) or nn.endswith("합계")  # 한양디지텍: 합계 행이 '매출원가와 판매비와관리비'
         if quarterly:
             if len(vals) < 2 or vals[1] is None:
                 continue
@@ -128,7 +128,7 @@ def _fix_units(rep, q20):
             R = q20["매출액"][i] if i is not None else None
             tot = r["total"][0]
         else:
-            idx = [lab.get(f"{k[2:4]}.{q}Q") for q in (1, 2, 3, 4)]
+            idx = [lab.get(f"{k[2:4]}.{q}Q") for q in range(1, m // 3 + 1)]  # 반기는 1~2Q, 3분기 누적은 1~3Q 합과 비교
             R = sum(q20["매출액"][j] for j in idx) if all(j is not None and q20["매출액"][j] for j in idx) else None
             tot = r["total"][1]
         if not R or not tot:
