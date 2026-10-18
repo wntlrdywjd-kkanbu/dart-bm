@@ -548,6 +548,11 @@ def _seg_types(lines):
         mult = _unit(cap)
         if not mult:
             continue
+        hc = [re.sub(r"\s+", "", x) for x in ln.strip().strip("|").split("|")]
+        trail = 0
+        if "품목" in hc and any(x.startswith("주요상표") for x in hc) and hc.index("품목") < len(hc) - 1:
+            ix_ = [j for j, x in enumerate(hc) if x.startswith("주요상표")][0]
+            trail = ix_ - hc.index("품목")  # 품목 뒤에 오는 라벨 칸 수(구체적 용도 + 주요상표)
         items, total, k = {}, None, i + 1
         while k < len(lines) and lines[k].startswith("|"):
             c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
@@ -556,6 +561,10 @@ def _seg_types(lines):
             if p is None:
                 continue
             q_ = p - 1
+            if trail and re.sub(r"\s+", "", c[q_]) not in ("합계", "계", "총계", "소계"):  # 헤더가 '품목 | 구체적 용도 | 주요상표' 순서(SFA반도체): 품목 칸 뒤의 용도·상표 칸을 건너뛴다
+                q_ = p - 1 - trail
+                if q_ < 0:
+                    continue
             while q_ > 0 and re.sub(r"\s+", "", c[q_]) in ("별첨", "-", "–", "해당없음", ""):
                 q_ -= 1
             nm = re.sub(r"\s+", "", c[q_])
