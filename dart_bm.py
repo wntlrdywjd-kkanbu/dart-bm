@@ -544,12 +544,15 @@ def _seg_types(lines):
             p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+", v)), None)
             if p is None:
                 continue
-            nm = re.sub(r"\s+", "", c[p - 1])
+            q_ = p - 1
+            while q_ > 0 and re.sub(r"\s+", "", c[q_]) in ("별첨", "-", "–", "해당없음", ""):
+                q_ -= 1
+            nm = re.sub(r"\s+", "", c[q_])
             amt = float(c[p].replace(",", ""))
             if nm in ("합계", "계", "총계"):
                 total = amt
             elif nm != "소계":
-                nm = re.sub(r"\(.*", "", c[p - 1]).strip() or c[p - 1]
+                nm = re.sub(r"\(.*", "", c[q_]).strip() or c[q_]
                 items[nm] = items.get(nm, 0) + amt
         if any(re.sub(r"\s+", "", n_) in ("수출", "내수", "국내", "해외") or "판매" in n_ for n_ in items):
             continue
@@ -597,7 +600,9 @@ def _seg_wide(lines):
 
 def seg_from_lines(lines):
     r = _seg_main(lines)
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_types(lines) or _seg_wide(lines)
+    if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
+        r = None
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines)
 
 
 def _seg_product(lines):
