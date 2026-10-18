@@ -559,9 +559,45 @@ def _seg_types(lines):
     return None
 
 
+def _seg_wide(lines):
+    """헤더 '사업부문 | 매출유형 | 품목 | 구체적용도 | 주요상표등 | 제N기 | 제N-1기 …'(기별 매출액·비중 2열씩) 표(메가터치).
+    부문(첫 칸)별로 당기(첫 숫자 칸) 금액을 합산. 첫 칸이 병합돼 생략된 행은 직전 부문. 합계와 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or "사업부문" not in ln.replace(" ", "") or "매출유형" not in ln.replace(" ", ""):
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        rows, k = [], i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            rows.append([x.strip() for x in lines[k].strip().strip("|").split("|")])
+            k += 1
+        full = max((len(c) for c in rows), default=0)
+        items, total, name = {}, None, None
+        for c in rows:
+            p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+", v)), None)
+            if p is None:
+                continue
+            c0 = re.sub(r"\s+", "", c[0])
+            amt = float(c[p].replace(",", ""))
+            if c0 in ("합계", "계", "총계"):
+                total = amt
+                continue
+            if len(c) >= full and c[0]:
+                name = c[0]
+            if name is None or c0 == "소계":
+                continue
+            items[name] = items.get(name, 0) + amt
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k2: v * mult for k2, v in items.items()}
+        return None
+    return None
+
+
 def seg_from_lines(lines):
     r = _seg_main(lines)
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_types(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_types(lines) or _seg_wide(lines)
 
 
 def _seg_product(lines):
