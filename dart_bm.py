@@ -528,9 +528,40 @@ def _seg_inline(lines):
     return None
 
 
+def _seg_types(lines):
+    """서비스형 회사: 헤더 '매출유형 | 품목 | 당기(매출액|비율) ...' 표. 유형·품목 칸이 생략된 행도 마지막 라벨 칸을 이름으로, 첫 숫자 칸을 당기 금액으로 읽는다. 합계와 3% 이내로 맞을 때만 사용."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or "매출유형" not in ln.replace(" ", "") or "품목" not in ln.replace(" ", ""):
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, k = {}, None, i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+", v)), None)
+            if p is None:
+                continue
+            nm = re.sub(r"\s+", "", c[p - 1])
+            amt = float(c[p].replace(",", ""))
+            if nm in ("합계", "계", "총계"):
+                total = amt
+            elif nm != "소계":
+                nm = re.sub(r"\(.*", "", c[p - 1]).strip() or c[p - 1]
+                items[nm] = items.get(nm, 0) + amt
+        if any(re.sub(r"\s+", "", n_) in ("수출", "내수", "국내", "해외") or "판매" in n_ for n_ in items):
+            continue
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k2: v * mult for k2, v in items.items()}
+        return None
+    return None
+
+
 def seg_from_lines(lines):
     r = _seg_main(lines)
-    return r or _seg_inline(lines) or _seg_product(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_types(lines)
 
 
 def _seg_product(lines):
