@@ -764,11 +764,50 @@ def _seg_subtotal(lines):
     return None
 
 
+def _seg_export(lines):
+    """헤더 '매출유형 | 품목 | 기간…' 에 품목마다 '수출/내수/합계' 3행이 붙는 표(티에프이). 품목별 '합계' 행의 당기 금액만 읽는다.
+    마지막 총 합계 행과 3% 이내일 때만 채택."""
+    for i, ln in enumerate(lines):
+        h = ln.replace(" ", "")
+        if not ln.startswith("|") or "매출유형" not in h or "품목" not in h or "구체적용도" in h:
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, cur, k = {}, None, None, i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            c = [x for x in c]
+            cs = [re.sub(r"\s+", "", x) for x in c]
+            if "수출" in cs[:3] and cs[0] not in ("합계",):
+                nm = [x for x, y in zip(c[:3], cs[:3]) if y not in ("수출", "제품", "상품", "") and not re.fullmatch(r"[\d,.\-]+", y)]
+                if nm:
+                    cur = nm[0]
+                continue
+            if cs[0] == "합계" and len(cs) > 1 and cs[1] in ("수출", "내수"):
+                continue
+            if cs[0] == "내수":
+                continue
+            if cs[0] == "합계" and len(cs) > 1 and re.fullmatch(r"-?[\d,]+", cs[1]):
+                v = float(cs[1].replace(",", ""))
+                if cur:
+                    items[cur] = v
+                    cur = None
+                else:
+                    total = v
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {n: v * mult for n, v in items.items()}
+        return None
+    return None
+
+
 def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines)
 
 
 def _seg_product(lines):
