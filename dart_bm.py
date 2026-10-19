@@ -254,6 +254,9 @@ def pick_fin(rows):
                     break
             if found:
                 break
+        if not found and label in ("재고자산", "매출채권"):
+            names = [r.get("account_nm") for r in rows if r.get("sj_div") in divs][:60]
+            print(f"[경고] {label} 계정 못 찾음. BS 계정: {names}", file=sys.stderr)
         if not found and label == "매출액":  # 계정명이 표준과 다른 보고서: IS 첫 '수익/매출' 계열 행으로 대체
             for r in rows:
                 nm = norm(r.get("account_nm"))
