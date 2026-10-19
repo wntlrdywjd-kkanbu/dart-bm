@@ -113,6 +113,23 @@ def extra(base, meta, fin):
     ex = {}
     qs = list(reversed(fin.get("quarters") or []))
     keys = ["매출액", "영업이익", "당기순이익", "매출원가", "판관비", "매출총이익", "영업활동현금흐름", "투자활동현금흐름", "재무활동현금흐름"]
+    # 상장 직후 종목(씨엠티엑스): 전년 1분기 보고서가 없고 반기보고서가 3개월 열 없이 반기 누적만 줄 때, 그 값이 2분기 단독으로
+    # 보이면 분기 차트·전년비가 왜곡된다 → 해당 분기를 비우고 반기 누적값은 h1only 로 따로 보관한다.
+    _pr = fin.get("periods_raw") or {}
+    ex["h1only"] = []
+    _qk = {x["key"]: x for x in qs}
+    for x in qs:
+        k_ = x["key"]
+        if not k_.endswith(".06") or x.get("how") != "직접":
+            continue
+        p1_ = _qk.get(k_[:4] + ".03")
+        rv_ = (_pr.get(k_) or {}).get("매출액") or {}
+        if p1_ is not None and any(v is not None for v in (p1_.get("values") or {}).values()):
+            continue
+        if rv_.get("당기") is None or rv_.get("당기") != rv_.get("당기누적"):
+            continue
+        ex["h1only"].append({"key": k_, "label": x["label"], "values": dict(x.get("values") or {})})
+        x["values"] = {}
     q20 = {"labels": [x["label"] for x in qs], "keys": [x["key"] for x in qs], "check": [x["label"] for x in qs if x.get("check")]}
     for k in keys:
         q20[k] = series(qs, k)
@@ -145,6 +162,8 @@ def extra(base, meta, fin):
             _it = {}
             for n, v in s_["items"].items():
                 k_ = _sa.get(n, _sa.get(re.sub(r"\s+", " ", n).strip(), n))
+                if k_ == "":  # seg_alias 값이 "" 이면 그 항목은 뺀다(표 열 오독으로 기간이 틀린 소액 항목)
+                    continue
                 _it[k_] = _it.get(k_, 0) + v
             s_["items"] = _it
     if segs:
@@ -525,6 +544,9 @@ def build(code):
     except OSError:
         pass
     doc.update(extra(base, meta, fin))
+    _lp = fin.get("latest_period") or ""
+    if any(h["key"] == f"{int(_lp[:4]) - 1}{_lp[4:]}" for h in (doc.get("h1only") or [])) and _lp:
+        doc["yoy_latest"] = {}  # 전년동기가 반기 누적뿐이라 3개월 비교 불가
     for h_ in (doc.get("notes") or {}).get("hide") or []:  # notes.hide: 파싱 값이 의미 없는 섹션 숨김(예: 생산능력 기준 재산출로 분기 차분이 음수)
         doc.pop(h_, None)
     s = json.dumps(doc, ensure_ascii=False)
