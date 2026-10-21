@@ -231,7 +231,7 @@ def extra(base, meta, fin):
     if len(oh) >= 3:
         units = [o["unit"] for o in oh if o.get("unit")]
         un = max(set(units), key=units.count) if units else ""
-        mm = re.search(r"([\d,]+)", un)
+        mm = re.search(r"(\d[\d,]*)", un)
         us = "US" in un or "$" in un
         mult = 1e3 if "K$" in un.replace(" ", "") else float(mm.group(1).replace(",", "")) if mm else (1e8 if "억" in un else 1e6 if "백만" in un else 1e3 if "천" in un else 1.0)
         div = 1e6 if us else 1e8
