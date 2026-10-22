@@ -391,6 +391,9 @@ def extra(base, meta, fin):
             rows_ = it_.get("_cf") or []
             a_ = cfrow(rows_, r"^유형자산의?취득$|^유형자산취득$")
             b_ = cfrow(rows_, r"^무형자산의?취득$|^무형자산취득$")
+            c_ = cfrow(rows_, r"^건설중인자산의?취득$")  # 유형자산 취득과 건설중인자산 취득을 따로 적는 회사(디케이티)는 합산
+            if a_ is not None and c_ is not None:
+                a_ = abs(a_) + abs(c_)
             if a_ is None and b_ is None:
                 # 자산 종류별로 쪼개 적는 회사(큐알티: 기계장치·건설중인자산·기타유형자산의 취득)는 합산
                 sa_ = sb_ = 0.0
