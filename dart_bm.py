@@ -838,7 +838,53 @@ def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines)
+
+
+def _seg_item(lines):
+    """'주요 제품 등의 현황' 표(매출유형 | 품목 | 당기 매출액 | 비율 ...): 품목별로 제품·상품·임가공 합산, 총계와 3% 이내 일치할 때만."""
+    blocks = split_blocks(lines)
+    ctx = ""
+    for b in blocks:
+        if b["type"] == "text":
+            ctx = b["text"]
+            continue
+        rows = b["rows"]
+        if len(rows) == 1 and "단위" in rows[0]:
+            ctx = ctx + " " + rows[0]
+            continue
+        head = " ".join(rows[:2]).replace(" ", "")
+        cap = ctx + " " + (b.get("caption") or "")
+        ctx = ""
+        if "매출유형" not in head or "품목" not in head or len(rows) < 6:
+            continue
+        mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", cap)
+        if not mu:
+            continue
+        mult = {"백만원": 1e6, "천원": 1e3, "원": 1.0}[mu.group(1)]
+        items, total = {}, None
+        for r in rows[2:]:
+            c = [x.strip() for x in r.strip().strip("|").split("|")]
+            if len(c) < 3:
+                continue
+            nm0 = c[0].replace(" ", "")
+            if nm0 == "총계":
+                total = _num(c[1])
+                continue
+            if nm0.endswith("계") or nm0 == "합계":
+                continue
+            v1 = c[1].replace(" ", "")
+            if re.match(r"^[-\d,.]+$", v1):
+                nm, v = c[0], _num(c[1])
+            else:
+                nm, v = c[1], _num(c[2])
+            if v is None:
+                continue
+            nm = nm.strip()
+            items[nm] = items.get(nm, 0) + v
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k: v * mult for k, v in items.items()}
+    return None
 
 
 def _seg_product(lines):
