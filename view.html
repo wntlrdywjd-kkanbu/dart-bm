@@ -263,14 +263,24 @@ h2.vd b { color: var(--accent); font-weight: 600; }
   }
   // 표(마크다운)에서 '비율/비중' 열이 있는 매출 구성표를 찾아 가로 막대 항목으로 변환
   function segItems(text) {
-    var lines = (text || "").split("\n").filter(function (l) { return l.indexOf("|") === 0; });
+    var blocks = [], cur = null;
+    (text || "").split("\n").forEach(function (l) {
+      if (l.indexOf("*") === 0) { cur = null; return; }
+      if (l.indexOf("|") !== 0) return;
+      if (!cur) { cur = []; blocks.push(cur); }
+      cur.push(l);
+    });
+    var blk = blocks.filter(function (b) { return /매출액/.test(b[0]) && !/매입액/.test(b[0]); })[0];
     var items = [];
-    lines.forEach(function (l) {
+    if (!blk) return items;
+    var hd = blk[0].replace(/^\||\|$/g, "").split("|").map(function (x) { return x.trim(); });
+    var ni = hd.indexOf("품목"); if (ni < 0) ni = hd.indexOf("품 목");
+    blk.slice(1).forEach(function (l) {
       var c = l.replace(/^\||\|$/g, "").split("|").map(function (x) { return x.trim(); });
       var m = c[c.length - 1].match(/^([\d.]+)%$/);
       if (!m || c.length < 4) return;
-      var nm = c[Math.max(0, c.length - 4)];
-      if (/^(합\s*계|계)$/.test(nm.replace(/\s/g, "")) || nm === "-" || !nm) return;
+      var nm = c[ni >= 0 && c.length === hd.length ? ni : Math.max(0, c.length - 4)].replace(/^[-·\s]+/, "");
+      if (/^(합\s*계|계)$/.test(nm.replace(/\s/g, "")) || !nm) return;
       items.push({ n: nm, v: parseFloat(m[1]) });
     });
     return items;
@@ -373,6 +383,7 @@ h2.vd b { color: var(--accent); font-weight: 600; }
   // ------- 섹션 틀: 질문형 제목 + 한 줄 판정(코드가 숫자로 작성, notes 의 headlines 가 있으면 그것을 우선) + 선택 서술(notes.texts)
   function sec(s, key, q, verdict, body) {
     var nt = s.notes && !Array.isArray(s.notes) ? s.notes : {};
+    if ((nt.hide || []).indexOf(key) >= 0) return "";
     var hl = (nt.headlines || {})[key] || verdict, tx = (nt.texts || {})[key] || [];
     return "<section class='card sec' id='" + key + "'><div class='q'>" + esc(q) + "</div><h2 class='vd'>" + rich(hl) + "</h2>" +
       body + (tx.length ? "<div class='tx'><h3>부연 설명</h3>" + tx.map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>" : "") + "</section>";
