@@ -421,7 +421,13 @@ h2.vd b { color: var(--accent); font-weight: 600; }
 
   // 증권사 추정 문자열을 표로: "라벨 a → b → c" 묶음은 연도 열 표, "1Q25 84.5 / 2Q25 .." 는 분기 열 표, 나머지는 줄 나열
   var _ey = [];
+  // 구조형 est: {k:제목, cols:[열이름], rows:[[라벨, 값1, 값2, ...]]} (표) 또는 {k:제목, items:[문장]} (목록). 구형 {k,v} 문자열은 아래에서 추측 변환
   function estHtml(e) {
+    if (Array.isArray(e.cols) && Array.isArray(e.rows)) {
+      var hd = "<h4 class='ec'>" + esc(e.k) + (e.unit ? " <span style='font-weight:400'>(" + esc(e.unit) + ")</span>" : "") + "</h4>";
+      return hd + "<div class='scroll'><table class='e2'><thead><tr><th></th>" + e.cols.map(function (a) { return "<th class='n" + (/[EFP]$/.test(a) ? " fc" : "") + "'>" + esc(a) + "</th>"; }).join("") + "</tr></thead><tbody>" + e.rows.map(function (r) { return "<tr><td>" + esc(r[0]) + "</td>" + r.slice(1).map(function (x) { return "<td class='n'>" + esc(x) + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+    }
+    if (Array.isArray(e.items)) return "<h4 class='ec'>" + esc(e.k) + "</h4><ul class='el'>" + e.items.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
     var k = String(e.k), v = String(e.v), segs = v.split(" / "), yrs = k.match(/20\d\d[A-Z]?/g) || [], cap = k.replace(/,?\s*20\d\d.*\)\s*$/, ")").replace(/,\s*\)$/, ")");
     if (yrs.length > 1) _ey = yrs; else yrs = _ey;
     function th(a) { return "<th class='n" + (/[EF]$/.test(a) ? " fc" : "") + "'>" + esc(a) + "</th>"; }
