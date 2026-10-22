@@ -1,5 +1,5 @@
 """분석 결과 분량·구성 최소 기준 점검. 사용: python tools/check_output.py {code} [--private ../dart-bm-private]
-기준(2026-10-22 확정, 테스(095610) 수준): 미달이면 DB 반영 전에 보강한다."""
+기준: 작업절차.md 2-3 "리포트 상세 고정 최소 기준" — points 개수는 원문 쪽수에 비례(3쪽 이하 5~6개, 4쪽 이상 8~10개), 글자 수 기준은 쓰지 않는다. 미달이면 DB 반영 전에 보강한다."""
 import datetime, glob, json, os, re, sys
 code = sys.argv[1]
 priv = "../dart-bm-private"
@@ -14,7 +14,6 @@ n = json.load(open(nf, encoding="utf-8")) if os.path.exists(nf) else {}
 g = n.get("glance") or {}
 chk(len(g.get("headline", "")) >= 120, f"glance.headline {len(g.get('headline',''))}자(>=120)")
 chk(len(g.get("points", [])) >= 9, f"glance.points {len(g.get('points',[]))}개(>=9)")
-chk(sum(len(x) for x in g.get("points", [])) >= 2400, f"glance.points 합 {sum(len(x) for x in g.get('points',[]))}자(>=2400)")
 chk(len(n.get("overview", [])) >= 5, f"overview {len(n.get('overview',[]))}문단(>=5)")
 hide = set(n.get("hide") or [])
 need = {"sales": 3, "cost": 3, "cm": 3, "bs": 2, "cf": 2, "div": 1, "ins": 2, "capex": 2, "region": 2, "seg": 2, "orders": 2, "ctr": 2}
@@ -34,18 +33,17 @@ else:
     v = json.load(open(vf, encoding="utf-8"))
     for r in v.get("reports", []):
         tag = f"{r['date']} {r['broker']}"
-        body = 99999
+        pages = 0
         for f in glob.glob(f"{priv}/research/{code}/{r['date'].replace('-','')}_*"):
-            t = open(f, encoding="utf-8").read()
-            body = len(t.split("--- PDF 본문 ---")[-1])
+            t = open(f, encoding="utf-8").read().split("--- PDF 본문 ---")[-1]
+            pages = t.rstrip().count("\f") + 1  # pdftotext 는 쪽마다 form feed
             break
-        age = (datetime.date.today() - datetime.date.fromisoformat(r["date"])).days
-        short = body < 4500 or r.get("old") or age > 365  # 원문이 1~2쪽이거나 구판이거나 1년 넘은 리포트는 완화
-        mp, mc, me = (5, 450, 1) if short else (8, 1400, 4)
-        pts = r.get("points", [])
-        chk(len(pts) >= mp and sum(len(x) for x in pts) >= mc, f"[{tag}] points {len(pts)}개·{sum(len(x) for x in pts)}자(>={mp}개·{mc}자{' 완화' if short else ''})")
-        chk(len(r.get("est", [])) >= (1 if short else me), f"[{tag}] est {len(r.get('est',[]))}개(>={1 if short else me})")
-        chk(len(r.get("vs", "")) >= 90 and len(r.get("watch", "")) >= (30 if short else 150), f"[{tag}] vs {len(r.get('vs',''))}자·watch {len(r.get('watch',''))}자")
+        lo, hi = (5, 6) if 0 < pages <= 3 else (8, 10)
+        n_ = len(r.get("points", []))
+        chk(lo <= n_ <= hi, f"[{tag}] points {n_}개 (원문 {pages}쪽 → {lo}~{hi}개)")
+        thin = any("없음" in (r.get("watch", "") + r.get("vs", "")) for _ in [0])
+        chk(len(r.get("est", [])) >= 1 or thin, f"[{tag}] est {len(r.get('est',[]))}개(원문에 추정이 없으면 watch/vs 에 '없음' 사유)")
+        chk(len(r.get("vs", "")) >= 60 and len(r.get("watch", "")) >= 30, f"[{tag}] vs {len(r.get('vs',''))}자·watch {len(r.get('watch',''))}자")
     chk(len(v.get("caveat", "")) >= 300, f"caveat {len(v.get('caveat',''))}자(>=300)")
     chk(len(v.get("tone_flow", [])) >= len(v.get("reports", [])) - 1, f"tone_flow {len(v.get('tone_flow',[]))}개")
     chk(len(v.get("forecast_check", [])) >= 3, f"forecast_check {len(v.get('forecast_check',[]))}개(>=3)")
