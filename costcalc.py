@@ -26,6 +26,8 @@ def parse_table(t):
     quarterly = any("3개월" in r for r in rows[:3])
     q, cum, total = {}, {}, None
     total_first = None
+    total_label = ""
+    last_tot_label = ""
     for r in rows:
         cells = [x.strip() for x in r.strip().strip("|").split("|")]
         if len(cells) < 2:
@@ -40,7 +42,7 @@ def parse_table(t):
         if not name or vals[0] is None or name in ("구분", "구 분"):
             continue
         nn = re.sub(r"\(\*+\d*\)", "", re.sub(r"\s", "", name))
-        is_tot = nn.startswith(("합계", "계", "매출원가와판매비", "매출원가및판매비")) or nn.endswith("합계")  # 한양디지텍: 합계 행이 '매출원가와 판매비와관리비'
+        is_tot = nn.startswith(("합계", "계", "매출원가와판매비", "매출원가및판매비")) or nn.endswith("합계") or nn == "성격별비용"  # 테스: 합계 행이 '성격별 비용'. 한양디지텍: 합계 행이 '매출원가와 판매비와관리비'
         if quarterly:
             if len(vals) < 2 or vals[1] is None:
                 continue
@@ -48,10 +50,12 @@ def parse_table(t):
         else:
             a = b = vals[0] * mult
         if is_tot:
+            last_tot_label = nn
             if not q:  # 합계 행이 맨 위에 있는 표(서진시스템): 합계를 기억하고 항목을 계속 읽는다
                 total_first = (a, b)
                 continue
             total = (a, b)
+            total_label = nn
             break  # 첫 합계에서 종료(연결 표 하나만)
         q[name] = q.get(name, 0.0) + a
         cum[name] = cum.get(name, 0.0) + b
@@ -62,7 +66,9 @@ def parse_table(t):
             total = total_first
     if total is None or len(q) < 4:
         return None
-    return {"q": q, "cum": cum, "total": total, "quarterly": quarterly, "unit_known": unit_known}
+    if total_label == "" and last_tot_label:
+        total_label = last_tot_label
+    return {"q": q, "cum": cum, "total": total, "quarterly": quarterly, "unit_known": unit_known, "total_label": total_label}
 
 
 def load(cache_dir="cache/cost", files=None):
@@ -70,18 +76,25 @@ def load(cache_dir="cache/cost", files=None):
     out = {}
     for fp in (glob.glob(os.path.join(cache_dir, "*.json")) if not files else [os.path.join(cache_dir, f) for f in files if os.path.exists(os.path.join(cache_dir, f))]):
         d = json.load(open(fp, encoding="utf-8"))
+        cands = []
         for t in d["tables"]:
             if not any("성격별" in c for c in t.get("ctx", [])[-2:]):
                 continue
             p = parse_table(t)
             if p:
-                # 같은 기간의 정정 보고서가 있으면 접수번호가 큰 쪽(나중 것)이 덮어쓴다
-                prev = out.get(d["key"])
-                if prev is None or os.path.basename(fp) > prev["_f"]:
-                    p["_f"] = os.path.basename(fp)
-                    p["kind"] = d["kind"]
-                    out[d["key"]] = p
-                break
+                p["_last_ctx"] = "성격별" in (t.get("ctx") or [""])[-1]
+                cands.append(p)
+        # 판관비만 담은 표('판매비와관리비 합계'; 라벨이 '급여, 판관비' 등)가 성격별 표보다 앞에 오는 보고서(테스): 성격별 전체 표를 우선
+        full = [p for p in cands if not p.get("total_label", "").startswith("판매비와관리비")]
+        # 직전 제목에 '성격별'이 있는 표를 더 우선(제목이 '(1) 판매비와 관리비의 내역'인 표는 판관비 표: 2024.12 테스)
+        p = ([x for x in full if x["_last_ctx"]] or full or cands)[0] if cands else None
+        if p:
+            # 같은 기간의 정정 보고서가 있으면 접수번호가 큰 쪽(나중 것)이 덮어쓴다
+            prev = out.get(d["key"])
+            if prev is None or os.path.basename(fp) > prev["_f"]:
+                p["_f"] = os.path.basename(fp)
+                p["kind"] = d["kind"]
+                out[d["key"]] = p
     return out
 
 
