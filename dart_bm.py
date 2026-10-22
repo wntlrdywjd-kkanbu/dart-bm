@@ -803,11 +803,42 @@ def _seg_export(lines):
     return None
 
 
+def _seg_domexp(lines):
+    """'구 분 | 당기 | 전기…' + '금액' 2단 헤더에 그룹마다 '내수/수출/소계' 3행(그룹명은 내수 행에만)이 붙는 표(뉴파워프라즈마).
+    그룹별 '소계' 당기(첫 숫자)를 금액으로. 마지막 '합계' 와 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        h = ln.replace(" ", "")
+        if not ln.startswith("|") or not h.startswith("|구분|") or i + 1 >= len(lines) or "금액" not in lines[i + 1]:
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        names, subs, total, cur, k = [], [], None, None, i + 2
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            cs = [re.sub(r"\s+", "", x) for x in c]
+            if len(cs) >= 3 and cs[1] in ("내수", "수출") and cs[0] not in ("내수", "수출", "소계", "합계", ""):
+                cur = c[0]
+                continue
+            nums = [x for x in c[1:] if re.fullmatch(r"-?[\d,]+", x)]
+            if cs[0] == "소계" and nums and cur:
+                names.append(cur)
+                subs.append(float(nums[0].replace(",", "")))
+            elif cs[0] in ("합계", "계", "총계") and nums:
+                total = float(nums[0].replace(",", ""))
+        if len(names) >= 2 and total and abs(sum(subs) - total) <= total * 0.03:
+            return {n: v * mult for n, v in zip(names, subs)}
+        return None
+    return None
+
+
 def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines)
 
 
 def _seg_product(lines):

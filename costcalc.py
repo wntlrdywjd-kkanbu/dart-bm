@@ -36,7 +36,7 @@ def parse_table(t):
         vals = [_n(c) for c in cells[1:]]
         # '성격별 비용 합계 | 제품과 재공품의 감소(증가) | 값' 처럼 앞 칸이 합계 라벨을 반복하는 행: 둘째 칸을 계정명으로
         if (name and vals and vals[0] is None and len(cells) > 2 and _n(cells[2]) is not None
-                and re.sub(r"\s", "", name).endswith("합계") and cells[1]):
+                and (re.sub(r"\s", "", name).endswith("합계") or re.sub(r"\s", "", name) == "성격별비용") and cells[1]):
             name = cells[1]
             vals = [_n(c) for c in cells[2:]]
         if not name or vals[0] is None or name in ("구분", "구 분"):
