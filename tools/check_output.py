@@ -36,7 +36,10 @@ else:
     for r in v.get("reports", []):
         tag = f"{r['date']} {r['broker']}"
         pages = 0
-        for f in glob.glob(f"{priv}/research/{code}/{r['date'].replace('-','')}_*"):
+        d_ = r['date'].replace('-', '')
+        # 같은 날짜에 증권사 리포트가 둘 이상일 수 있어 증권사명까지 맞추고, 없으면 날짜만으로 찾는다
+        cands = sorted(glob.glob(f"{priv}/research/{code}/{d_}_{r['broker']}*")) or sorted(glob.glob(f"{priv}/research/{code}/{d_}_*"))
+        for f in cands:
             t = open(f, encoding="utf-8").read().split("--- PDF 본문 ---")[-1]
             pages = t.rstrip().count("\f") + 1  # pdftotext 는 쪽마다 form feed
             break
