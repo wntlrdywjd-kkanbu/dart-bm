@@ -394,7 +394,7 @@ def extra(base, meta, fin):
             c_ = cfrow(rows_, r"^건설중인자산의?취득$")  # 유형자산 취득과 건설중인자산 취득을 따로 적는 회사(디케이티)는 합산
             if a_ is not None and c_ is not None:
                 a_ = abs(a_) + abs(c_)
-            if a_ is None and b_ is None:
+            if a_ is None:
                 # 자산 종류별로 쪼개 적는 회사(큐알티: 기계장치·건설중인자산·기타유형자산의 취득)는 합산
                 sa_ = sb_ = 0.0
                 hit_ = False
@@ -407,7 +407,7 @@ def extra(base, meta, fin):
                     elif re.search(r"(소프트웨어|산업재산권|개발비|영업권|회원권|기타무형자산|기타의무형자산)의?취득$", nm_):
                         sb_ += abs(r_[1]); hit_ = True
                 if hit_:
-                    a_, b_ = sa_, sb_
+                    a_, b_ = sa_, (b_ or 0) + sb_
                     split_.add(k_)
             if a_ is not None or b_ is not None:
                 cum[k_] = (abs(a_ or 0), abs(b_ or 0))
