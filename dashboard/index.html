@@ -442,6 +442,16 @@ h2.vd b { color: var(--accent); font-weight: 600; }
     if (segs.length > 1 && qs.every(Boolean)) return "<h4 class='ec'>" + esc(k) + "</h4><div class='scroll'><table class='e2'><thead><tr>" + qs.map(function (x) { return th(x[0]); }).join("") + "</tr></thead><tbody><tr>" + qs.map(function (x) { return "<td class='n'>" + esc(x[1]) + "</td>"; }).join("") + "</tr></tbody></table></div>";
     return "<h4 class='ec'>" + esc(k) + "</h4><ul class='el'>" + segs.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>";
   }
+  // 부문 섹션 하단: 증권사 리포트 기준 제품군 표(notes.seg_report). DART 가 단일 항목이어도 틀(순서)은 그대로 두고 아래에 덧붙인다.
+  function segReport(nt) {
+    var r = nt.seg_report; if (!r) return "";
+    var h = "<div class='tx segrep'><h3>증권사 리포트 기준 (추정 포함)</h3>" + (r.src ? "<div class='meta'>" + esc(r.src) + "</div>" : "");
+    (r.tables || []).forEach(function (t) {
+      h += "<h4 class='ec'>" + esc(t.k) + (t.unit ? " (" + esc(t.unit) + ")" : "") + "</h4><div class='scroll'><table class='e2'><thead><tr><th></th>" + t.cols.map(function (c) { return "<th class='n'>" + esc(c) + "</th>"; }).join("") + "</tr></thead><tbody>" +
+        t.rows.map(function (rw) { return "<tr><td>" + esc(rw[0]) + "</td>" + rw.slice(1).map(function (x) { return "<td class='n'>" + esc(x) + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+    });
+    return h + (r.texts || []).map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>";
+  }
   function renderDetail(s) {
     var A = s.annual, q = s.q20, bs = s.bs, p = s.price, nt = s.notes && !Array.isArray(s.notes) ? s.notes : {}, n = q.labels.length, i = n - 1;
     var h = "<article class='wrap' id='" + s.code + "' style='gap:16px'>";
@@ -467,11 +477,12 @@ h2.vd b { color: var(--accent); font-weight: 600; }
       var tl = tot(li), tp = tot(li - 1), rows = sg.names.map(function (nm, r) { var a = sg.values[r][li], b = sg.values[r][li - 1]; return { n: nm, a: a, sh: a != null && tl ? a / tl * 100 : null, d: a != null && tl && b != null && tp ? a / tl * 100 - b / tp * 100 : null }; });
       var top = rows[0], mv = rows.slice().sort(function (x, y) { return Math.abs(y.d || 0) - Math.abs(x.d || 0); })[0];
       var tb = "<div class='scroll'><table><thead><tr><th>사업부문</th><th class='n'>매출 (억)</th><th class='n'>비중</th><th class='n'>직전 보고서 대비</th></tr></thead><tbody>" + rows.map(function (r) { return "<tr><td>" + esc(r.n) + "</td><td class='n'>" + eok(r.a) + "</td><td class='n'>" + pct(r.sh) + "</td><td class='n " + cls(r.d) + "'>" + pp(r.d) + "</td></tr>"; }).join("") + "</tbody></table></div>";
-      h += sec(s, "seg", "무엇을 얼마나 파는가", "**" + top.n + "** 비중 " + pct(top.sh) + "로 1위. 직전 보고서 대비 변화가 가장 큰 곳은 " + mv.n + " " + pp(mv.d) + ".",
-        "<div class='charts'>" + stackedPct("사업부문별 매출 비중 추이", "보고서별 · " + sg.keys.length + "개 기간", sg.keys, sg.names, sg.values) + "<div>" + tb + "<div class='meta'>비중은 각 보고서의 '주요 제품 등의 현황' 표 기준(분기·반기는 누적).</div></div></div>");
+      h += sec(s, "seg", "무엇을 얼마나 파는가", rows.length === 1 ? "DART 공시는 단일 사업부문(**" + esc(top.n) + "**, 비중 " + pct(top.sh) + ")으로만 구분합니다. 제품군별 구성은 아래 증권사 리포트 기준을 참고하세요." : "**" + top.n + "** 비중 " + pct(top.sh) + "로 1위. 직전 보고서 대비 변화가 가장 큰 곳은 " + mv.n + " " + pp(mv.d) + ".",
+        "<div class='charts'>" + stackedPct("사업부문별 매출 비중 추이", "보고서별 · " + sg.keys.length + "개 기간", sg.keys, sg.names, sg.values) + "<div>" + tb + "<div class='meta'>비중은 각 보고서의 '주요 제품 등의 현황' 표 기준(분기·반기는 누적).</div></div></div>" + segReport(nt));
     } else {
       var i1 = segItems(s.secs.s21).length ? segItems(s.secs.s21) : segItems(s.secs.s2);
-      if (i1.length) h += sec(s, "seg", "무엇을 얼마나 파는가", "**" + esc(i1[0].n) + "** 비중 " + i1[0].v.toFixed(1) + "%.", "<div class='charts'>" + hbars("매출 비중", s.latest, i1) + "</div>");
+      if (i1.length) h += sec(s, "seg", "무엇을 얼마나 파는가", "**" + esc(i1[0].n) + "** 비중 " + i1[0].v.toFixed(1) + "%.", "<div class='charts'>" + hbars("매출 비중", s.latest, i1) + "</div>" + segReport(nt));
+      else if (nt.seg_report) h += sec(s, "seg", "무엇을 얼마나 파는가", "DART 보고서에서 제품별 매출 표를 확인하지 못했습니다. 아래는 증권사 리포트 기준입니다.", segReport(nt));
     }
 
     var rg = s.region;
