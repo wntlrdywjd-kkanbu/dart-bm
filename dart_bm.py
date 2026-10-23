@@ -834,8 +834,47 @@ def _seg_domexp(lines):
     return None
 
 
+def _seg_group(lines):
+    """'품목 | 제품설명 | 매출액 | 비중' 표에서 품목(rowspan 그룹) 아래 세부 행이 이어지는 형식(알멕: 압출제품 → EV Components·자동차 일반 부품…, 주조제품 → 빌렛, 기타매출).
+    행 길이가 헤더보다 1 길면 새 그룹(c[0])+세부(c[1]), 같으면 직전 그룹의 세부, 1 짧으면 그룹 없는 단독 품목. 합계(총계)와 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or "매출액" not in ln or not re.search(r"비율|구성비|비중", ln):
+            continue
+        hdr = [c.strip() for c in ln.strip().strip("|").split("|")]
+        if len(hdr) != 4 or hdr[0].replace(" ", "") != "품목" or "설명" not in hdr[1] or not re.match(r"(비율|구성비|비중)", hdr[-1]):
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, grp, k = {}, None, None, i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            amt = _num(c[-2]) if len(c) >= 3 else None
+            c0 = c[0].replace(" ", "")
+            if c0 in ("합계", "계", "총계"):
+                total = amt
+                continue
+            if amt is None:
+                continue
+            if len(c) == len(hdr) + 1:
+                grp, nm = c[0], f"{c[0]}·{c[1]}"
+            elif len(c) == len(hdr):
+                nm = f"{grp}·{c[0]}" if grp else c[0]
+            elif len(c) == len(hdr) - 1:
+                grp, nm = None, c[0]
+            else:
+                return None
+            items[nm] = items.get(nm, 0) + amt
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k2: v * mult for k2, v in items.items()}
+        return None
+    return None
+
+
 def seg_from_lines(lines):
-    r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_main(lines)
+    r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
     return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines)
