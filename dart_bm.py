@@ -895,7 +895,7 @@ def _seg_item(lines):
         head = " ".join(rows[:2]).replace(" ", "")
         cap = ctx + " " + (b.get("caption") or "")
         ctx = ""
-        if "매출유형" not in head or "품목" not in head or len(rows) < 6:
+        if "매출유형" not in head or ("품목" not in head and "제품명" not in head) or len(rows) < 6:
             continue
         mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", cap)
         if not mu:
@@ -907,7 +907,7 @@ def _seg_item(lines):
             if len(c) < 3:
                 continue
             nm0 = c[0].replace(" ", "")
-            if nm0 == "총계":
+            if nm0 == "총계" or nm0.endswith("총계"):
                 total = _num(c[1])
                 continue
             if nm0.endswith("계") or nm0 == "합계":
