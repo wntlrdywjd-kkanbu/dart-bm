@@ -1115,11 +1115,14 @@ def order_series(biz):
         sh_ = head.replace(" ", "")
         # 헤더 1줄형: '| 품목 | 당기수주 | 납품액 | 수주잔고 |' (기가비스)
         one_hdr = len(b["rows"]) == 2 and "수주잔고" in sh_ and "당기수주" in sh_ and "납품액" in sh_ and "수주총액" not in sh_
-        if len(b["rows"]) < 3 and not one_hdr:
+        # 잔액 1열형: '| 품목·구분 | 수주잔액 |' + 행 1~여러 개 (RFHIC: 총액만 간략 기재)
+        one_bal = len(b["rows"]) >= 2 and "수주잔액" in b["rows"][0].replace(" ", "") and "수주총액" not in sh_ and "납품" not in sh_ and "당기수주" not in sh_ \
+            and len([c for c in b["rows"][0].strip().strip("|").split("|") if c.strip()]) == 2
+        if len(b["rows"]) < 3 and not one_hdr and not one_bal:
             continue
-        if not ("수주잔고" in sh_ and ("수주총액" in sh_ or "기납품" in sh_ or one_hdr)):
+        if not ("수주잔고" in sh_ and ("수주총액" in sh_ or "기납품" in sh_ or one_hdr)) and not one_bal:
             continue
-        r0 = 1 if one_hdr else 2
+        r0 = 1 if (one_hdr or one_bal) else 2
         unit = ""
         if pb and pb["type"] == "table" and len(pb["rows"]) == 1 and "단위" in pb["rows"][0]:
             unit = re.sub(r"[|\s]+", " ", pb["rows"][0]).strip()
@@ -1142,6 +1145,8 @@ def order_series(biz):
                 amt = [nums[1], nums[3], nums[5]] if len(nums) == 6 else [vals[-5], vals[-3], vals[-1]]
             elif len(nums) >= 3 and len(vals) >= 2:
                 amt = nums[-3:]
+            elif one_bal and len(vals) == 1:
+                amt = [None, None, vals[0]]
             else:
                 continue
             if contract_list and not re.match(r"^(합계|계|총계|소계)", name):
@@ -1167,7 +1172,9 @@ def order_series(biz):
                 krw = tots["KRW"][2]
             if "K$" in unit.replace(" ", "") or "USD" in tots:
                 unit = "K$"
-        if not tot and len(items) == 1 and rows_one_ok(b):
+        if not tot and one_bal and items:
+            tot = [None, None, sum(v for v in items.values() if v)]
+        elif not tot and len(items) == 1 and rows_one_ok(b):
             tot = [None, None, list(items.values())[0]]
             tot = _single_total(b, head, r0)
         if tot and tot[2] is not None:

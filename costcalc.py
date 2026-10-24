@@ -41,7 +41,7 @@ def parse_table(t):
             vals = [_n(c) for c in cells[2:]]
         if not name or vals[0] is None or name in ("구분", "구 분"):
             continue
-        nn = re.sub(r"\(\*+\d*\)", "", re.sub(r"\s", "", name))
+        nn = re.sub(r"\((\*+|주)\d*\)", "", re.sub(r"\s", "", name))
         is_tot = (nn.startswith(("합계", "계", "매출원가와판매비", "매출원가및판매비")) or nn.endswith("합계") or nn == "성격별비용") and not re.search(r"(급여|인건비|퇴직|복리후생)(비용)?합계$", nn)  # 기가비스: '종업원급여비용 합계'는 소계(총합계 아님)  # 테스: 합계 행이 '성격별 비용'. 한양디지텍: 합계 행이 '매출원가와 판매비와관리비'
         if quarterly:
             if len(vals) < 2 or vals[1] is None:
