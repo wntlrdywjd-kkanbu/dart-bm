@@ -1141,7 +1141,7 @@ def capa_from_lines(lines):
     for b in blocks:
         if b["type"] != "table" or len(b["rows"]) < 2:
             continue
-        hc = [re.sub(r"\s+", "", x) for x in b["rows"][0].strip().strip("|").split("|")]
+        hc = [re.sub(r"\(%\)", "", re.sub(r"\s+", "", x)) for x in b["rows"][0].strip().strip("|").split("|")]
         if len(hc) >= 4 and hc[-1] in ("가동률", "가동율", "평균가동률", "평균가동율") and re.search(r"가능|생산능력|CAPA", "".join(hc[-3:-1]), re.I) and re.search(r"실제|생산실적", "".join(hc[-3:-1])):
             for r in b["rows"][1:]:
                 cells = [x.strip() for x in r.strip().strip("|").split("|")]
@@ -1154,6 +1154,10 @@ def capa_from_lines(lines):
                 if None in nums:
                     continue
                 nm = re.sub(r"\(.*", "", re.sub(r"\s+", "", cells[-4]))
+                # '구분(회사) | 사업부문 | 가동가능시간 | 실제가동시간 | 평균가동률(%)' 표(코리아써키트): 회사별 같은 사업부문(PCB제조)이 있어 회사·부문으로 구분
+                if len(hc) >= 5 and hc[-5] == "구분" and hc[-4] == "사업부문" and len(cells) >= 5:
+                    co = re.sub(r"\((주|유)\)|\s+", "", cells[-5])
+                    nm = f"{co} {nm}" if co else nm
                 if nm:
                     groups[nm] = {"unit": "", "capa": nums[0], "prod": nums[1], "util": nums[2]}
     if groups:
