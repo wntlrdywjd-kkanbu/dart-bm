@@ -9,7 +9,7 @@
     "latest_report_nm": "반기보고서 (2026.06)",
     "latest_rcept_no": "20260814001022",
     "latest_rcept_dt": "20260814",
-    "generated_at": "2026-10-24T11:28:58"
+    "generated_at": "2026-10-24T11:33:15"
   },
   "fin": {
     "basis": "연결",
@@ -7924,7 +7924,7 @@
         "deliv": null,
         "backlog": 52123170.0,
         "items": {
-          "레이더용GaN전력증폭기": 52123170.0
+          "수주잔액(제출일 현재)": 52123170.0
         },
         "krw_backlog": null,
         "contracts": [],
@@ -7937,7 +7937,7 @@
         "deliv": null,
         "backlog": 76474122.0,
         "items": {
-          "레이더용GaN전력증폭기": 76474122.0
+          "수주잔액(제출일 현재)": 76474122.0
         },
         "krw_backlog": null,
         "contracts": [],
@@ -7950,7 +7950,7 @@
         "deliv": null,
         "backlog": 148208547.0,
         "items": {
-          "레이더용GaN전력증폭기": 148208547.0
+          "수주잔액(제출일 현재)": 148208547.0
         },
         "krw_backlog": null,
         "contracts": [],
@@ -7963,7 +7963,7 @@
         "deliv": null,
         "backlog": 137646177.0,
         "items": {
-          "레이더용GaN전력증폭기": 137646177.0
+          "수주잔액(제출일 현재)": 137646177.0
         },
         "krw_backlog": null,
         "contracts": [],
@@ -7976,7 +7976,7 @@
         "deliv": null,
         "backlog": 107468178.0,
         "items": {
-          "레이더용GaN전력증폭기": 107468178.0
+          "수주잔액(제출일 현재)": 107468178.0
         },
         "krw_backlog": null,
         "contracts": [],
@@ -7989,7 +7989,7 @@
         "deliv": null,
         "backlog": 188133655.0,
         "items": {
-          "레이더용GaN전력증폭기": 188133655.0
+          "수주잔액(제출일 현재)": 188133655.0
         },
         "krw_backlog": null,
         "contracts": [],
@@ -8002,7 +8002,7 @@
         "deliv": null,
         "backlog": 199480498.0,
         "items": {
-          "제12기(2026년반기)": 199480498.0
+          "수주잔액(제출일 현재)": 199480498.0
         },
         "krw_backlog": null,
         "contracts": [],
