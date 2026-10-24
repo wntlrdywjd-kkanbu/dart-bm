@@ -885,11 +885,64 @@ def _seg_group(lines):
     return None
 
 
+def _seg_svc(lines):
+    """'사업부문 | 매출유형 | (품목) | 구분(수출/내수) | 당기 금액·비율 …' 표(프로티나): 사업부문(첫 칸)별로 수출+내수를 합산.
+    사업부문 시작 행만 라벨 칸이 가득 차 있고 품목·내수·합계 행은 짧다. '합계 | 수출 …' 다음의 '합계' 행이 총합이며 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or "사업부문" not in ln or "매출유형" not in ln:
+            continue
+        hdr = [c.strip() for c in ln.strip().strip("|").split("|")]
+        nper = sum(1 for h in hdr if re.search(r"년도|반기|분기|\)", h))
+        if nper < 1 or nper > 4:
+            continue
+        if i + 1 >= len(lines) or "금액" not in lines[i + 1] or "비율" not in lines[i + 1]:
+            continue  # 기간마다 금액·비율 두 칸인 표만(그 외 표를 부문으로 잘못 읽지 않게)
+        npd = 2 * nper
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        rows, k = [], i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            rows.append([x.strip() for x in lines[k].strip().strip("|").split("|")])
+            k += 1
+        full = max((len(r) for r in rows), default=0)
+        L = full - npd - 1
+        if L < 2:
+            continue
+        groups, order, cur, total, grand = {}, [], None, None, False
+        for c in rows:
+            if len(c) < 1 + npd:
+                continue
+            first = c[0].replace(" ", "")
+            if first == "합계":
+                if len(c) == 2 + npd and c[1].replace(" ", "") in ("수출", "내수"):
+                    grand = True
+                elif len(c) == 1 + npd and grand:
+                    total = _num(c[1])
+                    break
+                continue
+            if grand:
+                continue
+            labels, gu, v = c[:-npd - 1], c[-npd - 1].replace(" ", ""), _num(c[-npd])
+            if gu not in ("수출", "내수"):
+                continue
+            if len(labels) >= L:
+                cur = re.sub(r"\s+", " ", labels[0]).strip()
+                if cur not in groups:
+                    groups[cur] = 0.0; order.append(cur)
+            if cur is not None and v is not None:
+                groups[cur] += v
+        if len(groups) >= 2 and total and abs(sum(groups.values()) - total) <= total * 0.03:
+            return {g: groups[g] * mult for g in order if groups[g]}
+    return None
+
+
 def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines)
 
 
 def _seg_item(lines):
