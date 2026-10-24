@@ -9,7 +9,7 @@
     "latest_report_nm": "반기보고서 (2026.06)",
     "latest_rcept_no": "20260814001022",
     "latest_rcept_dt": "20260814",
-    "generated_at": "2026-10-24T11:12:15"
+    "generated_at": "2026-10-24T11:28:58"
   },
   "fin": {
     "basis": "연결",
@@ -7865,7 +7865,151 @@
       "20220317000861.json",
       "20211115000741.json"
     ],
-    "orders_hist": [],
+    "orders_hist": [
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 33557927.0,
+        "items": {
+          "레이더용GaN전력증폭기": 33557927.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2023.12",
+        "kind": "사업"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 36706921.0,
+        "items": {
+          "레이더용GaN전력증폭기": 36706921.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2024.03",
+        "kind": "분기"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 66197388.0,
+        "items": {
+          "레이더용GaN전력증폭기": 66197388.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2024.06",
+        "kind": "반기"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 59416609.0,
+        "items": {
+          "레이더용GaN전력증폭기": 59416609.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2024.09",
+        "kind": "분기"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 52123170.0,
+        "items": {
+          "레이더용GaN전력증폭기": 52123170.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2024.12",
+        "kind": "사업"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 76474122.0,
+        "items": {
+          "레이더용GaN전력증폭기": 76474122.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2025.03",
+        "kind": "분기"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 148208547.0,
+        "items": {
+          "레이더용GaN전력증폭기": 148208547.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2025.06",
+        "kind": "반기"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 137646177.0,
+        "items": {
+          "레이더용GaN전력증폭기": 137646177.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2025.09",
+        "kind": "분기"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 107468178.0,
+        "items": {
+          "레이더용GaN전력증폭기": 107468178.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2025.12",
+        "kind": "사업"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 188133655.0,
+        "items": {
+          "레이더용GaN전력증폭기": 188133655.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2026.03",
+        "kind": "분기"
+      },
+      {
+        "unit": "천원",
+        "total": null,
+        "deliv": null,
+        "backlog": 199480498.0,
+        "items": {
+          "제12기(2026년반기)": 199480498.0
+        },
+        "krw_backlog": null,
+        "contracts": [],
+        "key": "2026.06",
+        "kind": "반기"
+      }
+    ],
     "segments": [
       {
         "key": "2022.06",
