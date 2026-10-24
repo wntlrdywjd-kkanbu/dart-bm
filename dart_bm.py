@@ -1174,6 +1174,7 @@ def order_series(biz):
                 unit = "K$"
         if not tot and one_bal and items:
             tot = [None, None, sum(v for v in items.values() if v)]
+            items = {"수주잔액(제출일 현재)": tot[2]}  # '구분' 열이 기간명('제12기 반기')인 표의 라벨을 화면에 쓰지 않음
         elif not tot and len(items) == 1 and rows_one_ok(b):
             tot = [None, None, list(items.values())[0]]
             tot = _single_total(b, head, r0)

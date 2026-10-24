@@ -221,10 +221,16 @@ def extra(base, meta, fin):
             yq = [yq[0] - 1, 4] if yq[1] == 1 else [yq[0], yq[1] - 1]
         qs_.reverse()
         qv = {k: 0.0 for k in qs_}
+        # 계약금액 정정 공시: 같은 상대방·계약 시작일의 체결 건 금액을 정정 후 금액으로 바꿔 집계(RFHIC 레이시온 506→296억)
+        fix_ = {}
+        for r in ctr:
+            if r["kind"] == "정정" and r.get("party") and r.get("start"):
+                fix_.setdefault((r["party"], r["start"]), r["amt"])  # ctr 는 최신순 → 가장 나중 정정이 먼저
         for r in ctr:
             if r["kind"] == "정정" or qk(r) not in qv:
                 continue
-            qv[qk(r)] += -r["amt"] if r["kind"] == "해지" else r["amt"]
+            amt_ = fix_.get((r.get("party"), r.get("start")), r["amt"]) if r["kind"] == "체결" else r["amt"]
+            qv[qk(r)] += -amt_ if r["kind"] == "해지" else amt_
         ex["ctr"] = {"rows": [[r["dt"], r["kind"], r.get("party", ""), r["amt"], r.get("pct"), r.get("start", ""), r.get("end", "")] for r in ctr[:30]],
                      "labels": qs_, "v": [qv[k] for k in qs_]}
     oh = fin.get("orders_hist") or []
