@@ -9,7 +9,7 @@
     "latest_report_nm": "반기보고서 (2026.06)",
     "latest_rcept_no": "20260814001510",
     "latest_rcept_dt": "20260814",
-    "generated_at": "2026-10-24T09:35:38"
+    "generated_at": "2026-10-24T09:40:51"
   },
   "fin": {
     "basis": "별도",
@@ -2303,7 +2303,53 @@
       "20250814001063.json"
     ],
     "orders_hist": [],
-    "segments": [],
+    "segments": [
+      {
+        "key": "2025.06",
+        "kind": "반기",
+        "items": {
+          "PPI PathFinder": 383276000.0,
+          "PPI Landscape": 130000000.0,
+          "SPID Platform System": 1512145000.0
+        }
+      },
+      {
+        "key": "2025.09",
+        "kind": "분기",
+        "items": {
+          "PPI PathFinder®": 427067000.0,
+          "PPI Landscape®": 160000000.0,
+          "SPID Platform Systems": 2020545000.0
+        }
+      },
+      {
+        "key": "2025.12",
+        "kind": "사업",
+        "items": {
+          "PPI PathFinder®": 627067000.0,
+          "PPI Landscape®": 250000000.0,
+          "SPID Platform Systems": 2073851000.0
+        }
+      },
+      {
+        "key": "2026.03",
+        "kind": "분기",
+        "items": {
+          "PPI PathFinder®": 49858000.0,
+          "PPI Landscape®": 100000000.0,
+          "SPID Platform Systems": 18700000.0
+        }
+      },
+      {
+        "key": "2026.06",
+        "kind": "반기",
+        "items": {
+          "PPI PathFinder®": 131048000.0,
+          "PPI Landscape®": 290000000.0,
+          "SPID Platform Systems": 96785000.0
+        }
+      }
+    ],
     "insider": [
       {
         "dt": "2026-08-25",
