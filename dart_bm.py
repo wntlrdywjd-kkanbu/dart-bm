@@ -1062,9 +1062,9 @@ def rows_one_ok(b):
     return True
 
 
-def _single_total(b, head):
+def _single_total(b, head, start=2):
     """합계 행 없이 한 행짜리(연결 전체) 수주상황 표: 마지막 3개 숫자를 수주총액·기납품액·수주잔고로."""
-    for r in b["rows"][2:]:
+    for r in b["rows"][start:]:
         nums = [v for v in _cellnums(r) if v is not None]
         if len(nums) >= 3:
             return nums[-3:]
@@ -1109,11 +1109,17 @@ def order_series(biz):
     prev = None
     for b in split_blocks(biz["all"]):
         pb, prev = prev, b
-        if b["type"] != "table" or len(b["rows"]) < 3:
+        if b["type"] != "table" or len(b["rows"]) < 2:
             continue
         head = " ".join(b["rows"][:2])
-        if not ("수주잔고" in head.replace(" ", "") and ("수주총액" in head.replace(" ", "") or "기납품" in head.replace(" ", ""))):
+        sh_ = head.replace(" ", "")
+        # 헤더 1줄형: '| 품목 | 당기수주 | 납품액 | 수주잔고 |' (기가비스)
+        one_hdr = len(b["rows"]) == 2 and "수주잔고" in sh_ and "당기수주" in sh_ and "납품액" in sh_ and "수주총액" not in sh_
+        if len(b["rows"]) < 3 and not one_hdr:
             continue
+        if not ("수주잔고" in sh_ and ("수주총액" in sh_ or "기납품" in sh_ or one_hdr)):
+            continue
+        r0 = 1 if one_hdr else 2
         unit = ""
         if pb and pb["type"] == "table" and len(pb["rows"]) == 1 and "단위" in pb["rows"][0]:
             unit = re.sub(r"[|\s]+", " ", pb["rows"][0]).strip()
@@ -1128,7 +1134,7 @@ def order_series(biz):
         last_cur = ""
         items = {}
         contract_list = "통화" in head.replace(" ", "")  # 계약별 나열 표(통화 열): 합계가 통화별로 따로 있음
-        for r in b["rows"][2:]:
+        for r in b["rows"][r0:]:
             name = re.sub(r"\s+", "", r.strip().strip("|").split("|")[0])
             nums = _cellnums(r)
             vals = [v for v in nums if v is not None]
@@ -1163,7 +1169,7 @@ def order_series(biz):
                 unit = "K$"
         if not tot and len(items) == 1 and rows_one_ok(b):
             tot = [None, None, list(items.values())[0]]
-            tot = _single_total(b, head)
+            tot = _single_total(b, head, r0)
         if tot and tot[2] is not None:
             res_ = {"unit": unit, "total": tot[0], "deliv": tot[1], "backlog": tot[2], "items": items, "krw_backlog": krw}
             res_["contracts"] = _contract_rows(b, head)
