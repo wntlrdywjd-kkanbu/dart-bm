@@ -279,6 +279,18 @@ def pick_fin(rows):
             if not found:
                 names = [r.get("account_nm") for r in rows if r.get("sj_div") in divs and "순" in (r.get("account_nm") or "")][:12]
                 print(f"[경고] 당기순이익 계정 못 찾음. 후보: {names}", file=sys.stderr)
+        if not found and label == "영업이익":  # '영업손실' 등 계정명 변형(코리아써키트 2024.03·06): 영업 손익 계열 IS 행으로 대체. 못 찾으면 경고
+            for r in rows:
+                nm = norm(r.get("account_nm"))
+                if r.get("sj_div") in divs and re.search(r"^영업(이익|손익|손실)", nm) and not re.search(r"외|활동|률", nm):
+                    found = {"당기": to_int(r.get("thstrm_amount")), "전기": to_int(r.get("frmtrm_amount")),
+                             "당기누적": to_int(r.get("thstrm_add_amount")), "전기누적": to_int(r.get("frmtrm_add_amount")),
+                             "전전기": to_int(r.get("bfefrmtrm_amount")), "account_nm": r.get("account_nm")}
+                    print(f"[안내] 영업이익 계정 대체: {r.get('account_nm')} 당기={r.get('thstrm_amount')} 누적={r.get('thstrm_add_amount')}", file=sys.stderr)
+                    break
+            if not found:
+                names = [r.get("account_nm") for r in rows if r.get("sj_div") in divs and "영업" in (r.get("account_nm") or "")][:12]
+                print(f"[경고] 영업이익 계정 못 찾음. 후보: {names}", file=sys.stderr)
         out[label] = found
     out["_cf"] = [[r.get("account_nm"), to_int(r.get("thstrm_amount"))] for r in rows if r.get("sj_div") == "CF"]  # 현금흐름표 원 행(워터폴용)
     return out
