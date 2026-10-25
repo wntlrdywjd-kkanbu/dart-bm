@@ -1463,7 +1463,7 @@ def region_from_lines(lines):
             continue
         blob = " ".join(rows)
         bs_ = re.sub(r"\s+", "", blob)
-        if not ("내수" in bs_ and "수출" in bs_ and ("합계" in bs_ or "총계" in bs_)):
+        if not (("내수" in bs_ or ("국내" in bs_ and "총합계" in bs_)) and "수출" in bs_ and ("합계" in bs_ or "총계" in bs_)):
             continue
         head = " ".join(rows[:2])
         if not re.search(r"제\s*\d+\s*기|당기|반기|분기", head):
