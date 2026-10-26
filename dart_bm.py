@@ -951,7 +951,7 @@ def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines)
 
 
 def _seg_item(lines):
@@ -1035,6 +1035,35 @@ def _seg_product(lines):
                 items[c[0].strip()] = v
         if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
             return {k: v * mult for k, v in items.items()}
+    return None
+
+
+def _seg_paren(lines):
+    """'품목 | 영업수익(비율 %) | 제품 설명' 표(케이티나스미디어): 행 '이름 | 금액(비율%) | 설명', '총계' 행과 3% 이내일 때만. 헤더에 '영업수익(비율'이 있는 표만."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or not re.search(r"영업수익\s*\(비율", ln) or "품목" not in ln:
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, k = {}, None, i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            if len(c) < 2:
+                continue
+            m = re.match(r"^([\d,]+)\s*\(", c[1])
+            if not m:
+                continue
+            v = float(m.group(1).replace(",", ""))
+            nm = c[0].replace(" ", "")
+            if nm in ("총계", "합계"):
+                total = v
+            else:
+                items[c[0].strip()] = v
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k_: v * mult for k_, v in items.items()}
     return None
 
 
