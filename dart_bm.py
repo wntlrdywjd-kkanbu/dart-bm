@@ -568,11 +568,18 @@ def _seg_types(lines):
         if "품목" in hc and any(x.startswith("주요상표") for x in hc) and hc.index("품목") < len(hc) - 1:
             ix_ = [j for j, x in enumerate(hc) if x.startswith("주요상표")][0]
             trail = ix_ - hc.index("품목")  # 품목 뒤에 오는 라벨 칸 수(구체적 용도 + 주요상표)
+        has_start = "개시일" in "".join(hc)  # '생산(판매) 개시일' 칸이 품목 뒤에 있는 표(아스플로): 개시일 칸('2005년'/'-')을 건너뛰고 '제품 계' 소계 행은 제외
         items, total, k, seen_sub = {}, None, i + 1, False
         while k < len(lines) and lines[k].startswith("|"):
             c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
             k += 1
             p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+(\s*\([\d.]+\s*%?\))?", v)), None)  # '181,084(20.24%)' 처럼 비율이 붙은 칸(동국제약)도 금액으로
+            if has_start:  # 개시일 칸 바로 다음 칸이 당기 금액('-'이면 0 → 건너뜀; 뒤쪽 전기 금액을 당기로 읽지 않는다)
+                d_ = next((x for x, v in enumerate(c) if x >= 1 and (re.fullmatch(r"\d{4}년", v.strip()) or (x == 2 and v.strip() == "-" and len(c) > 3 and not re.fullmatch(r"[\d,.%-]+", c[1].strip())))), None)
+                if d_ is not None:
+                    if d_ + 1 >= len(c) or not re.fullmatch(r"-?[\d,]+", c[d_ + 1].strip()):
+                        continue
+                    p = d_ + 1
             if p is None:
                 continue
             q_ = p - 1
@@ -580,9 +587,11 @@ def _seg_types(lines):
                 q_ = p - 1 - trail
                 if q_ < 0:
                     continue
-            while q_ > 0 and re.sub(r"\s+", "", c[q_]) in ("별첨", "-", "–", "해당없음", ""):
+            while q_ > 0 and (re.sub(r"\s+", "", c[q_]) in ("별첨", "-", "–", "해당없음", "") or (has_start and re.fullmatch(r"\d{4}년", c[q_].strip()))):
                 q_ -= 1
             nm = re.sub(r"\s+", "", c[q_])
+            if has_start and nm.endswith("계") and len(nm) > 1 and nm not in ("합계", "총계", "소계"):
+                continue
             amt = float(re.sub(r"\(.*", "", c[p]).replace(",", ""))
             if nm in ("합계", "계", "총계"):
                 total = amt
@@ -1504,6 +1513,8 @@ def region_from_lines(lines):
                 continue
             if grp in ("총계", "전체", "총합계") or (grp == "합계" and idx == 1):
                 tot.setdefault(grp, {})[lab] = tot.get(grp, {}).get(lab, 0.0) + v * mult
+            elif grp == "합계" and idx == 0 and v > 0 and "dom" in tot.get(grp, {}) and "exp" not in tot[grp]:  # '합계 | 내수 | …' 다음 줄 '수출 | …' (22.1Q 아스플로)
+                tot[grp]["exp"] = v * mult
         pick = tot.get("총계") or tot.get("전체") or tot.get("총합계") or tot.get("합계")
         if pick and "dom" in pick and "exp" in pick:
             dom, exp, found = pick["dom"], pick["exp"], 2
