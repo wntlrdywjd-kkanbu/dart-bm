@@ -951,7 +951,7 @@ def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines) or _seg_typecat(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines) or _seg_typecat(lines) or _seg_gubun(lines)
 
 
 def _seg_item(lines):
@@ -1093,6 +1093,37 @@ def _seg_typecat(lines):
             else:
                 continue
             if nm.replace(" ", "") in ("합계", "총계", "계"):
+                total = v
+            elif nm and nm not in items:
+                items[nm] = v
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k_: v * mult for k_, v in items.items()}
+    return None
+
+
+def _seg_gubun(lines):
+    """'구분 | 품목 | 당기 | 전기…' + 둘째 헤더 '매출액|비율' 표(LG씨엔에스): 행 '구분 | 품목 | 금액 | 비율 …', 구분(첫 칸)이 부문명, 첫 금액이 당기. '총합계/합계' 행과 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|"):
+            continue
+        hc = [x.replace(" ", "") for x in ln.strip().strip("|").split("|")]
+        if len(hc) < 4 or hc[0] != "구분" or hc[1] not in ("품목", "주요품목"):
+            continue
+        if i + 1 >= len(lines) or "비율" not in lines[i + 1]:
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, k = {}, None, i + 2
+        num = re.compile(r"^[\d,]+$")
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            if len(c) < 3 or not num.match(c[2].replace(" ", "")):
+                continue
+            nm, v = c[0], float(c[2].replace(",", ""))
+            if nm.replace(" ", "") in ("합계", "총합계", "총계", "계"):
                 total = v
             elif nm and nm not in items:
                 items[nm] = v
