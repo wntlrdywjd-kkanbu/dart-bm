@@ -144,7 +144,7 @@ def _fix_units(rep, q20):
             idx = [lab.get(f"{k[2:4]}.{q}Q") for q in range(1, m // 3 + 1)]  # 반기는 1~2Q, 3분기 누적은 1~3Q 합과 비교
             R = sum(q20["매출액"][j] for j in idx) if all(j is not None and q20["매출액"][j] for j in idx) else None
             tot = r["total"][1]
-        if not R or not tot:
+        if not R or not tot or R < 0 or tot < 0:
             out[k] = r
             continue
         g = min((1e-3, 1.0, 1e3), key=lambda g: abs(math.log(tot * g / R)))
