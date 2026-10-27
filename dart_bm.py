@@ -1628,7 +1628,7 @@ def _region_simple(blocks):
                     break
             if v is None:
                 continue
-            if k == 1 and re.sub(r"\s+", "", cells[0]) == "합계":  # 제품별 행 뒤의 '합계' 묶음 시작(수출 행). 이후 내수 행은 첫 칸에 라벨만 있음
+            if k == 1 and re.sub(r"\s+", "", cells[0]) in ("합계", "매출총계", "총매출", "매출합계"):  # 제품별 행 뒤의 '합계' 묶음 시작(수출 행). 이후 내수 행은 첫 칸에 라벨만 있음
                 in_tot = True
                 tot_row = (tot_row or {})
                 tot_row[lab] = tot_row.get(lab, 0.0) + v * mult
