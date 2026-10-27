@@ -951,7 +951,7 @@ def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines) or _seg_typecat(lines)
 
 
 def _seg_item(lines):
@@ -1062,6 +1062,40 @@ def _seg_paren(lines):
                 total = v
             else:
                 items[c[0].strip()] = v
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k_: v * mult for k_, v in items.items()}
+    return None
+
+
+def _seg_typecat(lines):
+    """'매출 유형 | 매출 구분 | 당기 | 전기…' + 둘째 헤더 '매출액|비율' 표(삼현): 행 '[유형 |] 구분 | 금액 | 비율 …', 첫 금액이 당기. '합 계' 행과 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        h = ln.replace(" ", "")
+        if not ln.startswith("|") or "매출유형" not in h or "매출구분" not in h:
+            continue
+        if i + 1 >= len(lines) or "비율" not in lines[i + 1]:
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, k = {}, None, i + 2
+        num = re.compile(r"^[\d,]+$")
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            if len(c) < 2:
+                continue
+            if num.match(c[1].replace(" ", "")):
+                nm, v = c[0], float(c[1].replace(",", ""))
+            elif len(c) >= 3 and num.match(c[2].replace(" ", "")):
+                nm, v = c[1], float(c[2].replace(",", ""))
+            else:
+                continue
+            if nm.replace(" ", "") in ("합계", "총계", "계"):
+                total = v
+            elif nm and nm not in items:
+                items[nm] = v
         if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
             return {k_: v * mult for k_, v in items.items()}
     return None
