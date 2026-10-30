@@ -1,0 +1,17 @@
+{
+  "_설명": "notes.json 의 industry 키(종목 화면 '산업 흐름'). 산업 카드(industries/{id})의 nodes 를 복사하고 이 종목 칸 번호만 mine 으로 지정.",
+  "industry": {
+    "id": "post-process",
+    "name": "산업명",
+    "asof": "YYYY-MM-DD(산업 카드 기준일과 동일)",
+    "reports": 18,
+    "link": "https://claude.ai/artifact/AYGvGGBTYtpNxvUwGVKWHi#산업id",
+    "mine": 3,
+    "lead": "이 종목은 산업 흐름 중 **○○** 구간에 있습니다. (산업 상황 → 종목에 유리/불리한 점 → 반대 변수) [해석]",
+    "easy": "쉽게 말하면 한두 문장",
+    "nodes": [{"n": "", "s": 3, "t": "강", "k": "", "p": "", "e": "", "d": [], "c": []}],
+    "tiles": [["숫자", "설명(출처)"]],
+    "place": ["**항목** 서술 [제3자 서술] — 이 종목에 닿는 산업 사실. 확인 못 한 것은 [확인 필요]"],
+    "counter": ["반대 시나리오 / 점검 지표"]
+  }
+}
