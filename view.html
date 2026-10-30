@@ -84,10 +84,16 @@ h2.vd b { color: var(--accent); font-weight: 600; }
 .tx { margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--line); } .tx h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); } .tx p { margin: 0 0 8px; max-width: none; line-height: 1.7; } .tx b, .glance b, .notes b { background: var(--accent-soft); padding: 0 2px; font-weight: 600; }
 .glance ul { margin: 0 0 8px 18px; padding: 0; max-width: none; } .glance li { margin: 5px 0; }
 .glance { border-color: var(--accent); }
-.bmq { display: grid; grid-template-columns: 92px 1fr; gap: 6px 12px; margin: 0; } .bmq dt { font-weight: 600; color: var(--muted); font-size: 12.5px; padding-top: 2px; } .bmq dd { margin: 0; line-height: 1.7; max-width: none; }
+.bm h3.bh { margin: 18px 0 6px; font-size: 14px; color: var(--ink); padding-bottom: 4px; border-bottom: 1px solid var(--line); } .bm h3.bh:first-of-type { margin-top: 4px; }
+.bp { margin: 6px 0; max-width: none; line-height: 1.75; } .bu { margin: 4px 0 4px 18px; padding: 0; max-width: none; line-height: 1.75; } .bu li { margin: 5px 0; }
+table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; padding: 7px 9px; font-size: 12.5px; line-height: 1.6; } table.bt td.b0 { font-weight: 600; min-width: 96px; } table.bt thead th { background: var(--accent-soft); color: var(--ink); }
+.flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; margin: 8px 0 4px; } .fn { flex: 1 1 140px; min-width: 0; border: 1px solid var(--accent); border-radius: 8px; padding: 9px 11px; background: var(--accent-soft); } .fn b { display: block; font-size: 13.5px; } .fn span { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); line-height: 1.5; } .fa { align-self: center; color: var(--accent); font-size: 22px; line-height: 1; }
+.fnote { color: var(--muted); font-size: 12.5px; }
 .iss { margin: 0 0 10px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 4px; } .iss .t { font-weight: 600; } .iss .ev, .iss .nx { margin-top: 3px; line-height: 1.65; max-width: none; } .iss .nx { color: var(--muted); font-size: 12.5px; }
-.rk { display: grid; grid-template-columns: 34px 1fr; gap: 8px; padding: 8px 0; border-top: 1px dashed var(--line); } .rk .sv { font-size: 12px; font-weight: 700; text-align: center; padding: 2px 0; border-radius: 4px; height: fit-content; border: 1px solid currentColor; } .rk .sv.s상 { color: var(--neg); } .rk .sv.s중 { color: var(--warn); } .rk .sv.s하 { color: var(--muted); } .rk .t { font-weight: 600; } .rk .d { line-height: 1.65; max-width: none; } .rk .im { color: var(--muted); font-size: 12.5px; }
-@media (max-width: 520px) { .bmq { grid-template-columns: 1fr; gap: 0; } .bmq dd { margin-bottom: 8px; } }
+@media (max-width: 520px) { .flow { flex-direction: column; } .fn { flex: 0 0 auto; } .fa { transform: rotate(90deg); text-align: center; }
+  table.bt { min-width: 0; } table.bt thead { display: none; } table.bt, table.bt tbody, table.bt tr, table.bt td { display: block; width: 100%; }
+  table.bt tr { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; margin-bottom: 8px; } table.bt td { border: 0; padding: 3px 0; } table.bt td.b0 { font-size: 13.5px; padding-bottom: 4px; }
+  table.bt td[data-l]:not(.b0)::before { content: attr(data-l) "  "; color: var(--muted); font-size: 11.5px; } .bm .scroll { overflow-x: visible; } }
 
 .sec .kpis { margin-bottom: 4px; }
 .card .charts .scroll { margin-top: 4px; }
@@ -471,13 +477,20 @@ h2.vd b { color: var(--accent); font-weight: 600; }
         stat("PSR", v.PSR != null ? v.PSR.toFixed(2) + "배" : "–", "TTM 매출 기준") + stat("배당수익률", v.배당수익률 != null ? v.배당수익률.toFixed(2) + "%" : "–", "최근 DPS ÷ 종가") + "</div>";
     }
     var ovH = nt.overview && nt.overview.length ? "<div class='overview'>" + nt.overview.map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>" : "<p class='oneline'>" + esc(s.one_line) + "</p>";
-    var bmNew = !!(nt.bm && nt.bm.length);  // bm 필드가 있으면 BM·쟁점·위험을 먼저 보이고 사업 서술 전체는 접어 둔다
+    var bmNew = !!(nt.bm && nt.bm.blocks && nt.bm.blocks.length);  // bm 필드가 있으면 BM·쟁점·위험을 먼저 보이고 사업 서술 전체는 접어 둔다
     h += (bmNew ? "" : ovH) + "<div class='meta'>사업 서술: " + esc(s.report) + " (" + fdate(s.report_dt) + ") · 최신: " + esc(s.latest) + " (" + fdate(s.latest_dt) + ") · 수집 " + esc((s.generated_at || "").slice(0, 10)) + " · 시세 " + (p ? p.date : "없음") + "</div></section>";
-    // BM 한눈에(무엇을·누구에게·어떻게 버나) + 핵심 쟁점 + 위험
-    if (nt.bm && nt.bm.length) h += "<section class='card'><div class='q'>BM 한눈에</div><dl class='bmq'>" + nt.bm.map(function (b) { return "<dt>" + esc(b.q) + "</dt><dd>" + rich(b.a) + "</dd>"; }).join("") + "</dl></section>";
+    // BM 통합 섹션: notes.bm.blocks (h 소제목 · p 문단 · ul 목록 · table 표 · flow 흐름도) + 핵심 쟁점
+    if (bmNew) {
+      h += "<section class='card bm'><div class='q'>사업 모델 (BM)</div><h2>무엇을, 누구에게, 어떻게 파는가</h2>" + nt.bm.blocks.map(function (b) {
+        if (b.t === "h") return "<h3 class='bh'>" + esc(b.x) + "</h3>";
+        if (b.t === "p") return "<p class='bp'>" + rich(b.x) + "</p>";
+        if (b.t === "ul") return "<ul class='bu'>" + b.items.map(function (x) { return "<li>" + rich(x) + "</li>"; }).join("") + "</ul>";
+        if (b.t === "table") return "<div class='scroll'><table class='bt'><thead><tr>" + b.cols.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "</tr></thead><tbody>" + b.rows.map(function (r) { return "<tr>" + r.map(function (c, ci) { return "<td data-l='" + esc(b.cols[ci]) + "'" + (ci === 0 ? " class='b0'" : "") + ">" + rich(c) + "</td>"; }).join("") + "</tr>"; }).join("") + "</tbody></table></div>";
+        if (b.t === "flow") return "<div class='flow'>" + b.nodes.map(function (nd, ni) { return (ni ? "<div class='fa'>›</div>" : "") + "<div class='fn'><b>" + esc(nd.n) + "</b><span>" + esc(nd.sub || "") + "</span></div>"; }).join("") + "</div>" + (b.note ? "<p class='bp fnote'>" + rich(b.note) + "</p>" : "");
+        return "";
+      }).join("") + "</section>";
+    }
     if (nt.issues && nt.issues.length) h += "<section class='card'><h2>핵심 쟁점</h2>" + nt.issues.map(function (x, k) { return "<div class='iss'><div class='t'>" + (k + 1) + ". " + rich(x.t) + "</div><div class='ev'>" + rich(x.ev) + "</div><div class='nx'>다음에 볼 것: " + rich(x.next) + "</div></div>"; }).join("") + "</section>";
-    if (nt.risks && nt.risks.length) h += "<section class='card'><h2>위험</h2>" + nt.risks.map(function (r) { return "<div class='rk'><div class='sv s" + esc(r.sev) + "'>" + esc(r.sev) + "</div><div><div class='t'>" + rich(r.t) + "</div><div class='d'>" + rich(r.now) + "</div><div class='im'>→ " + rich(r.impact) + "</div></div></div>"; }).join("") + "</section>";
-    if (bmNew) h += "<details class='card ovd'><summary>사업 서술 전체 보기</summary>" + ovH + "</details>";
     // 한눈에 보기(Claude 작성) 또는 구 형식 분석 메모
     if (nt.glance) h += "<section class='card glance'><div class='q'>한눈에 보기</div><h2 class='vd'>" + rich(nt.glance.headline || "") + "</h2><ul>" + (nt.glance.points || []).map(function (t) { return "<li>" + rich(t) + "</li>"; }).join("") + "</ul><div class='meta'>Claude가 공시 원문을 읽고 정리했습니다. [추정]은 공시에 없는 해석입니다.</div></section>";
     var memos = Array.isArray(s.notes) ? s.notes : nt.memos;
