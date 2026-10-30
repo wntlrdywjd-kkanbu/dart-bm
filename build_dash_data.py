@@ -96,7 +96,7 @@ def cfw(items):
     g = lambda k: (items.get(k) or {}).get("당기")
     ni = cfrow(rows, r"^(연결)?당기순(이익|손익|손실)(\(손실\))?$")
     adj = cfrow(rows, r"조정을위한가감|^조정$|^조정항목")
-    wc = cfrow(rows, r"자산부채의변동|자산및부채의변동")
+    wc = cfrow(rows, r"자산부채의변동|자산및부채의변동|자산및부채의증감|자산부채의증감")
     ocf, icf, fcf = g("영업활동현금흐름"), g("투자활동현금흐름"), g("재무활동현금흐름")
     _n = items.get("당기순이익") or {}
     if ni is not None and _n.get("당기누적") is not None and ni == _n.get("당기") and ni != _n["당기누적"]:
