@@ -89,6 +89,10 @@ h2.vd b { color: var(--accent); font-weight: 600; }
 table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; padding: 7px 9px; font-size: 12.5px; line-height: 1.6; } table.bt td.b0 { font-weight: 600; min-width: 96px; } table.bt thead th { background: var(--accent-soft); color: var(--ink); }
 .flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; margin: 8px 0 4px; } .fn { flex: 1 1 140px; min-width: 0; border: 1px solid var(--accent); border-radius: 8px; padding: 9px 11px; background: var(--accent-soft); } .fn b { display: block; font-size: 13.5px; } .fn span { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); line-height: 1.5; } .fa { align-self: center; color: var(--accent); font-size: 22px; line-height: 1; }
 .fnote { color: var(--muted); font-size: 12.5px; }
+.ind .lead { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 10px 12px; border-radius: 6px; margin: 8px 0; max-width: none; } .ind .easy { background: var(--bg); border-radius: 6px; padding: 7px 10px; margin: 6px 0; font-size: 13px; max-width: none; } .ind .easy::before { content: "쉽게 말하면 "; font-weight: 700; color: var(--accent); }
+.ind details.nd { border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; background: var(--surface); } .ind details.nd.dim { opacity: .55; } .ind details.nd.me { border: 2px solid var(--accent); opacity: 1; } .ind details.nd summary { cursor: pointer; padding: 8px 10px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .ind details.nd .body { padding: 0 10px 8px; } .ind details.nd .body p { margin: 4px 0; max-width: none; } .ind details.nd .body ul { margin: 4px 0; padding-left: 18px; line-height: 1.6; max-width: none; }
+.ind .sev { font-size: 11px; padding: 0 8px; border-radius: 10px; border: 1.5px solid var(--warn); color: var(--warn); white-space: nowrap; } .ind .sev.s3 { background: var(--warn); color: var(--surface); } .ind .sev.s1 { border-color: var(--muted); color: var(--muted); } .ind .here { font-size: 11px; background: var(--accent-soft); color: var(--accent); border-radius: 10px; padding: 0 8px; font-weight: 600; } .ind .k { font-size: 12.5px; color: var(--muted); } .ind .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; } .ind .chip { font-size: 12px; padding: 0 8px; border-radius: 10px; background: var(--bg); } .ind .chip.a { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.ind .tl { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 8px 0; } .ind .tl div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; } .ind .tl b { display: block; font-size: 17px; color: var(--accent); overflow-wrap: anywhere; } .ind .tl span { font-size: 12px; color: var(--muted); } .ind a.more { display: inline-block; margin-top: 8px; padding: 7px 12px; border: 1px solid var(--accent); border-radius: 8px; color: var(--accent); text-decoration: none; } .ind .stale { color: var(--warn); border: 1px solid var(--warn); border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
 .iss { margin: 0 0 10px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 4px; } .iss .t { font-weight: 600; } .iss .ev, .iss .nx { margin-top: 3px; line-height: 1.65; max-width: none; } .iss .nx { color: var(--muted); font-size: 12.5px; }
 @media (max-width: 520px) { .flow { flex-direction: column; } .fn { flex: 0 0 auto; } .fa { transform: rotate(90deg); text-align: center; }
   table.bt { min-width: 0; } table.bt thead { display: none; } table.bt, table.bt tbody, table.bt tr, table.bt td { display: block; width: 100%; }
@@ -464,6 +468,21 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
     });
     return h + (r.texts || []).map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>";
   }
+  function indHtml(ind) {  // notes.industry: 산업 흐름 섹션(산업 대시보드 카드에서 복사한 요약; 카드가 갱신되면 같이 고친다)
+    var old = ind.asof && (Date.now() - new Date(ind.asof + "T00:00:00").getTime()) / 864e5 > 60;
+    var h = "<section class='card ind'><div class='q'>산업 흐름</div><h2>" + esc(ind.name) + " 산업에서 이 종목의 위치</h2><div class='meta'>기준일 " + esc(ind.asof) + (old ? "<span class='stale'>갱신 필요(60일 초과)</span>" : "") + " · 근거: 산업 카드 「" + esc(ind.name) + "」 보고서 " + esc(ind.reports) + "건</div>";
+    if (ind.lead) h += "<div class='lead'>" + rich(ind.lead) + "</div>";
+    if (ind.easy) h += "<div class='easy'>" + rich(ind.easy) + "</div>";
+    h += (ind.nodes || []).map(function (d, i) {
+      var me = i === ind.mine;
+      return "<details class='nd" + (me ? " me" : " dim") + "'" + (me ? " open" : "") + "><summary><b>" + (i + 1) + ". " + esc(d.n) + "</b><span class='sev s" + d.s + "'>병목 " + esc(d.t) + "</span>" + (me ? "<span class='here'>이 종목 위치</span>" : "") + "<span class='k'>" + esc(d.k) + "</span></summary><div class='body'>" + (d.e ? "<div class='easy'>" + esc(d.e) + "</div>" : "") + "<p>" + esc(d.p) + "</p><ul>" + (d.d || []).map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" + (d.c && d.c.length ? "<div class='chips'>" + d.c.map(function (x) { return "<span class='chip" + (String(x).indexOf("★") > 0 ? " a" : "") + "'>" + esc(x) + "</span>"; }).join("") + "</div>" : "") + "</div></details>";
+    }).join("");
+    if (ind.tiles && ind.tiles.length) h += "<h3 class='bh'>핵심 숫자</h3><div class='tl'>" + ind.tiles.map(function (a) { return "<div><b>" + esc(a[0]) + "</b><span>" + esc(a[1]) + "</span></div>"; }).join("") + "</div>";
+    if (ind.place && ind.place.length) h += "<h3 class='bh'>이 종목의 자리</h3><ul class='bu'>" + ind.place.map(function (x) { return "<li>" + rich(x) + "</li>"; }).join("") + "</ul>";
+    if (ind.counter && ind.counter.length) h += "<h3 class='bh'>반대 시나리오와 점검</h3><ol class='bu'>" + ind.counter.map(function (x) { return "<li>" + rich(x) + "</li>"; }).join("") + "</ol>";
+    if (ind.link) h += "<a class='more' href='" + esc(ind.link) + "' target='_blank' rel='noopener'>산업 대시보드에서 더 보기 (공정별 근거·차트·시각 차이) →</a>";
+    return h + "</section>";
+  }
   function renderDetail(s) {
     var A = s.annual, q = s.q20, bs = s.bs, p = s.price, nt = s.notes && !Array.isArray(s.notes) ? s.notes : {}, n = q.labels.length, i = n - 1;
     var h = "<article class='wrap' id='" + s.code + "' style='gap:16px'>";
@@ -479,6 +498,7 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
     var ovH = nt.overview && nt.overview.length ? "<div class='overview'>" + nt.overview.map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>" : "<p class='oneline'>" + esc(s.one_line) + "</p>";
     var bmNew = !!(nt.bm && nt.bm.blocks && nt.bm.blocks.length);  // bm 필드가 있으면 BM·쟁점·위험을 먼저 보이고 사업 서술 전체는 접어 둔다
     h += (bmNew ? "" : ovH) + "<div class='meta'>사업 서술: " + esc(s.report) + " (" + fdate(s.report_dt) + ") · 최신: " + esc(s.latest) + " (" + fdate(s.latest_dt) + ") · 수집 " + esc((s.generated_at || "").slice(0, 10)) + " · 시세 " + (p ? p.date : "없음") + "</div></section>";
+    if (nt.industry && nt.industry.nodes) h += indHtml(nt.industry);
     // BM 통합 섹션: notes.bm.blocks (h 소제목 · p 문단 · ul 목록 · table 표 · flow 흐름도) + 핵심 쟁점
     if (bmNew) {
       h += "<section class='card bm'><div class='q'>사업 모델 (BM)</div><h2>무엇을, 누구에게, 어떻게 파는가</h2>" + nt.bm.blocks.map(function (b) {
