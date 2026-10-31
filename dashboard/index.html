@@ -467,7 +467,7 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
     });
     return h + (r.texts || []).map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>";
   }
-  var IND_DEEP = {"post-process": [{ id: "post-process-substrate", title: "기판 심층 — 유효 캐파·가격 경로·업체별 증설·유리기판", nodes: ["패키지 기판", "유리 코어 (2028+)"] }]};  // industry/index.json 의 deep 과 같게 유지
+  var IND_DEEP = {"post-process": [{ id: "post-process-substrate", title: "기판 심층 — 유효 캐파·가격 경로·업체별 증설·유리기판", nodes: ["패키지 기판", "유리 코어 (2028+)"] }, { id: "post-process-2p5d", title: "2.5D 패키징 심층 — CoWoS 캐파 병기·CoWoS-L vs EMIB-T·CAPEX 불일치", nodes: ["2.5D 패키징"] }]};  // industry/index.json 의 deep 과 같게 유지
   function indHtml(ind) {  // notes.industry: 산업 흐름 섹션(산업 대시보드 카드에서 복사한 요약; 카드가 갱신되면 같이 고친다)
     var old = ind.asof && (Date.now() - new Date(ind.asof + "T00:00:00").getTime()) / 864e5 > 60;
     var h = "<section class='card ind'><div class='q'>산업 흐름</div><h2>" + esc(ind.name) + " 산업에서 이 종목의 위치</h2><div class='meta'>기준일 " + esc(ind.asof) + (old ? "<span class='stale'>갱신 필요(60일 초과)</span>" : "") + " · 근거: 산업 카드 「" + esc(ind.name) + "」 보고서 " + esc(ind.reports) + "건</div>";
