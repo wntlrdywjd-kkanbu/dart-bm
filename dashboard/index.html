@@ -796,8 +796,8 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
   function openStock(db, code) {
     sel = code; try { localStorage.setItem("bm_sel", code); } catch (e) { }
     if (unsubS) unsubS(); if (unsubR) unsubR(); rs = null; cur = null; render();
-    unsubS = db.doc("stocks/" + code).onSnapshot(load, function () { $("#detail").innerHTML = "<div class='card empty'>분석 결과를 읽지 못했습니다.</div>"; });
-    unsubR = db.doc("research/" + code).onSnapshot(function (sn) { var d = sn.exists ? sn.data() : null; rs = d && d.code === code ? d : null; render(); }, function () { });
+    unsubS = db.doc("stocks/" + code).onSnapshot(function (sn) { if (sn.exists) return load(sn); fetch("data/stocks/" + code + ".json").then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (j) { if (sel === code) load({ exists: true, data: function () { return j; } }); }).catch(function () { load(sn); }); }, function () { $("#detail").innerHTML = "<div class='card empty'>분석 결과를 읽지 못했습니다.</div>"; });
+    unsubR = db.doc("research/" + code).onSnapshot(function (sn) { if (sn.exists) { var d = sn.data(); rs = d && d.code === code ? d : null; render(); return; } fetch("data/research/" + code + ".json").then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (j) { if (sel === code) { rs = j && j.code === code ? j : null; render(); } }).catch(function () { rs = null; render(); }); }, function () { });
   }
   function pickList(db, q) {
     var pl = $("#pl"), t = (q || "").trim().toLowerCase();
