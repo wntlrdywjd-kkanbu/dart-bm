@@ -468,6 +468,7 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
     });
     return h + (r.texts || []).map(function (t) { return "<p>" + rich(t) + "</p>"; }).join("") + "</div>";
   }
+  var IND_DEEP = {"post-process": [{ id: "post-process-substrate", title: "기판 심층 — 유효 캐파·가격 경로·업체별 증설·유리기판", nodes: ["패키지 기판", "유리 코어 (2028+)"] }, { id: "post-process-2p5d", title: "2.5D 패키징 심층 — CoWoS 캐파 병기·CoWoS-L vs EMIB-T·CAPEX 불일치", nodes: ["2.5D 패키징"] }, { id: "post-process-hbm", title: "HBM 적층 심층 — 웨이퍼 잠식·TSV 캐파·HBM5 로드맵·CXMT", nodes: ["HBM 적층·TSV"] }, { id: "post-process-test", title: "테스트·OSAT 심층 — 수주 재집계·CLT·Probe Card·메모리 외주", nodes: ["웨이퍼 테스트", "패키지 테스트", "메모리 모듈·OSAT"] }]};  // industry/index.json 의 deep 과 같게 유지
   function indHtml(ind) {  // notes.industry: 산업 흐름 섹션(산업 대시보드 카드에서 복사한 요약; 카드가 갱신되면 같이 고친다)
     var old = ind.asof && (Date.now() - new Date(ind.asof + "T00:00:00").getTime()) / 864e5 > 60;
     var h = "<section class='card ind'><div class='q'>산업 흐름</div><h2>" + esc(ind.name) + " 산업에서 이 종목의 위치</h2><div class='meta'>기준일 " + esc(ind.asof) + (old ? "<span class='stale'>갱신 필요(60일 초과)</span>" : "") + " · 근거: 산업 카드 「" + esc(ind.name) + "」 보고서 " + esc(ind.reports) + "건</div>";
@@ -480,6 +481,8 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
     if (ind.tiles && ind.tiles.length) h += "<h3 class='bh'>핵심 숫자</h3><div class='tl'>" + ind.tiles.map(function (a) { return "<div><b>" + esc(a[0]) + "</b><span>" + esc(a[1]) + "</span></div>"; }).join("") + "</div>";
     if (ind.place && ind.place.length) h += "<h3 class='bh'>이 종목의 자리</h3><ul class='bu'>" + ind.place.map(function (x) { return "<li>" + rich(x) + "</li>"; }).join("") + "</ul>";
     if (ind.counter && ind.counter.length) h += "<h3 class='bh'>반대 시나리오와 점검</h3><ol class='bu'>" + ind.counter.map(function (x) { return "<li>" + rich(x) + "</li>"; }).join("") + "</ol>";
+    var dp = (IND_DEEP[ind.id] || []).filter(function (x) { var me = (ind.nodes || [])[ind.mine]; return me && x.nodes.indexOf(me.n) >= 0; });
+    if (dp.length && ind.link) h += "<h3 class='bh'>심층 페이지</h3><ul class='bu'>" + dp.map(function (x) { return "<li><a href='" + esc(ind.link.split('#')[0]) + "#" + esc(x.id) + "' target='_blank' rel='noopener'>" + esc(x.title) + " →</a></li>"; }).join("") + "</ul>";
     if (ind.link) h += "<a class='more' href='" + esc(ind.link) + "' target='_blank' rel='noopener'>산업 대시보드에서 더 보기 (공정별 근거·차트·시각 차이) →</a>";
     return h + "</section>";
   }
