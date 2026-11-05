@@ -729,8 +729,9 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
   }
   function opChart(R) {
     var a = R.op26 || []; if (a.length < 2) return "";
-    var mx = Math.max.apply(null, a.map(function (r) { return r.v; })), rowH = 24, W = 640, L = 100, pw = W - L - 70, h = a.length * rowH + 8, g = "";
-    a.forEach(function (r, i) { var y = 4 + i * rowH, w = r.v / mx * pw; g += "<text x='4' y='" + (y + 15) + "'>" + r.d + " " + esc(r.b) + "</text><rect x='" + L + "' y='" + y + "' width='" + w + "' height='17' rx='2' fill='" + (i === a.length - 1 ? "var(--s1)" : "var(--s3)") + "'><title>" + esc(r.d + " " + r.b + " 26년 영업이익 추정 " + r.v + "억") + "</title></rect><text class='vt' x='" + (L + w + 5) + "' y='" + (y + 13) + "'>" + r.v.toLocaleString("ko-KR") + "억</text>"; });
+    var vs = a.map(function (r) { return r.v; }), hi = Math.max(0, Math.max.apply(null, vs)), lo = Math.min(0, Math.min.apply(null, vs)), span = (hi - lo) || 1, rowH = 24, W = 640, L = 100, pw = W - L - 70, h = a.length * rowH + 8, g = "";
+    function X(v) { return L + (v - lo) / span * pw; }
+    a.forEach(function (r, i) { var y = 4 + i * rowH, x1 = X(Math.min(r.v, 0)), w = Math.max(1.5, Math.abs(X(r.v) - X(0))), tx = r.v >= 0 ? x1 + w + 5 : x1 - 5; g += "<text x='4' y='" + (y + 15) + "'>" + r.d + " " + esc(r.b) + "</text><rect x='" + x1 + "' y='" + y + "' width='" + w + "' height='17' rx='2' fill='" + (i === a.length - 1 ? "var(--s1)" : "var(--s3)") + "'><title>" + esc(r.d + " " + r.b + " 26년 영업이익 추정 " + r.v + "억") + "</title></rect><text class='vt' x='" + tx + "' y='" + (y + 13) + "'" + (r.v < 0 ? " text-anchor='end'" : "") + ">" + r.v.toLocaleString("ko-KR") + "억</text>"; });
     return "<figure class='chart'><figcaption><b>2026년 영업이익 추정치의 이동</b><span>리포트 시점별 · 억원</span></figcaption><svg viewBox='0 0 " + W + " " + h + "' role='img' aria-label='2026년 영업이익 추정치'>" + g + "</svg></figure>";
   }
   function researchBlock(R) {
