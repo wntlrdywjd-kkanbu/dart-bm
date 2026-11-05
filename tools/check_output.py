@@ -43,14 +43,18 @@ else:
     for r in v.get("reports", []):
         tag = f"{r['date']} {r['broker']}"
         pages = 0
+        thin_src = False
         d_ = r['date'].replace('-', '')
         # 같은 날짜에 증권사 리포트가 둘 이상일 수 있어 증권사명까지 맞추고, 없으면 날짜만으로 찾는다
         cands = sorted(glob.glob(f"{priv}/research/{code}/{d_}_{r['broker']}*")) or sorted(glob.glob(f"{priv}/research/{code}/{d_}_*"))
         for f in cands:
             t = open(f, encoding="utf-8").read().split("--- PDF 본문 ---")[-1]
             pages = t.rstrip().count("\f") + 1  # pdftotext 는 쪽마다 form feed
+            thin_src = len(t.strip()) < 200 * pages  # 이미지형·껍데기 PDF(쪽당 글자 200자 미만): 작업절차 규칙 6, 지어내지 않는다
             break
         lo, hi = (5, 6) if 0 < pages <= 3 else (8, 10)
+        if thin_src:
+            lo = 1
         n_ = len(r.get("points", []))
         chk(lo <= n_ <= hi, f"[{tag}] points {n_}개 (원문 {pages}쪽 → {lo}~{hi}개)")
         thin = any("없음" in (r.get("watch", "") + r.get("vs", "")) for _ in [0])
