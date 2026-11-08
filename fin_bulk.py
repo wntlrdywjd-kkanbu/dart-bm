@@ -144,7 +144,9 @@ def consumer(rec):
     lk = max(p) if p else None
     if not lk:
         return None
-    qs = D.build_quarters(p, lk, 12, n=NQ)
+    qi = lambda k: k[0] * 4 + k[1] // 3
+    n = min(60, max(NQ, qi(lk) - qi(min(p)) + 1))  # 저장된 기간 전체(누적). 백필 직후는 12분기, 시즌마다 1분기씩 늘어난다
+    qs = D.build_quarters(p, lk, 12, n=n)
     out = []
     for i, q in enumerate(qs):
         s, o = q["values"].get("매출액"), q["values"].get("영업이익")
@@ -222,9 +224,7 @@ def incremental(rec, new_reps):
     rec["r"] = {f"{k[0]}.{k[1]:02d}": [v["rcept_dt"], v["rcept_no"]] for k, v in allreps.items()}
     rec["rd"] = max(v["rcept_dt"] for v in allreps.values())
     rec["ts"] = datetime.datetime.now().strftime("%Y-%m-%d")
-    keep = set(f"{k[0]}.{k[1]:02d}" for k in needed_keys(lk))
-    rec["p"] = {k: v for k, v in rec["p"].items() if k in keep}
-    return True
+    return True  # 오래된 기간은 지우지 않고 계속 누적한다
 
 
 def main():
