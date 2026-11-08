@@ -1,21 +1,27 @@
-"""fnlttMultiAcnt: 연도별 응답 시간 vs 가공 시간 분리 측정."""
-import contextlib, io, json, time
+"""현재 DART 응답 속도 점검: 묶음 크기·단건 조회 비교 (재시도 없이 원시 요청, 호출 8번)."""
+import json, os, time, requests
 import dart_bm as D
-import fin_bulk as F
 
 uni = [x["code"] for x in json.load(open("fin_q/universe.json", encoding="utf-8"))]
 bycode = {c["stock_code"]: c["corp_code"] for c in D.load_corps() if c["stock_code"]}
 codes = [bycode[c] for c in uni if c in bycode]
-batch = codes[400:500]
-for year, rc in ((2026, "11012"), (2024, "11012"), (2022, "11013"), (2019, "11013"), (2019, "11014")):
+K = os.environ["DART_API_KEY"].strip()
+
+def call(path, **p):
+    p["crtfc_key"] = K
     t = time.time()
-    j = D._orig_get if False else D.get_json("fnlttMultiAcnt.json", corp_code=",".join(batch), bsns_year=str(year), reprt_code=rc)
-    t1 = time.time() - t
-    L = j.get("list") or []
-    t = time.time()
-    grp = {}
-    for r in L:
-        grp.setdefault((r["corp_code"], r.get("fs_div")), []).append(r)
-    with contextlib.redirect_stderr(io.StringIO()):
-        n = sum(1 for k, rs in grp.items() if F.compact(D.pick_fin(rs)))
-    print(f"{year}/{rc}: 응답 {t1:.1f}s rows={len(L)} | 가공 {time.time()-t:.2f}s 그룹={len(grp)} 유효={n}", flush=True)
+    try:
+        r = requests.get(f"https://opendart.fss.or.kr/api/{path}", params=p, timeout=100)
+        j = r.json()
+        return time.time() - t, j.get("status"), len(j.get("list") or []), len(r.content)
+    except Exception as e:
+        return time.time() - t, type(e).__name__, 0, 0
+
+plan = [("multi", 10, 600), ("multi", 100, 600), ("single", 1, 600), ("multi", 10, 700), ("multi", 100, 700),
+        ("single", 1, 700), ("multi", 25, 800), ("multi", 100, 1000)]
+for kind, size, off in plan:
+    if kind == "multi":
+        res = call("fnlttMultiAcnt.json", corp_code=",".join(codes[off:off + size]), bsns_year="2025", reprt_code="11012")
+    else:
+        res = call("fnlttSinglAcntAll.json", corp_code=codes[off], bsns_year="2025", reprt_code="11012", fs_div="CFS")
+    print(f"{kind} size={size} off={off}: {res[0]:.1f}s status={res[1]} rows={res[2]} bytes={res[3]}", flush=True)
