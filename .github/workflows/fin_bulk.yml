@@ -1,0 +1,62 @@
+name: fin_bulk
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "backfill(처음·이어받기) / update(새 정기보고서만, 간격 무관) / codes(지정 종목 재수집)"
+        required: true
+        default: "backfill"
+        type: choice
+        options: [backfill, update, codes]
+      max_calls:
+        description: "이번 실행 DART 호출 상한(일일 한도 20,000 안쪽)"
+        required: false
+        default: "17000"
+      codes:
+        description: "codes 모드용 종목코드(쉼표 구분)"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fin-bulk
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: DART 분기 실적 수집
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          MODE: ${{ inputs.mode }}
+          MAXC: ${{ inputs.max_calls }}
+          CODES: ${{ inputs.codes }}
+        run: |
+          mkdir -p fin_q
+          python fin_bulk.py "$MODE" --max-calls "${MAXC:-17000}" --codes "$CODES" 2>&1 | tee fin_q/last_run.log
+          exit ${PIPESTATUS[0]}
+
+      - name: 결과 커밋
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add fin_q cache/corp_map.json
+          git diff --cached --quiet || git commit -m "fin_bulk: ${{ inputs.mode }}"
+          git pull -q --rebase && git push
