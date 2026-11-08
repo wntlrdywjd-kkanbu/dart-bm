@@ -4,18 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "backfill(처음·이어받기) / update(새 정기보고서만, 간격 무관) / codes(지정 종목 재수집)"
+        description: "backfill(전체 재구성, 약 1,000호출) / update(작년~올해만 재조회·병합, 약 200호출)"
         required: true
         default: "backfill"
         type: choice
-        options: [backfill, update, codes]
+        options: [backfill, update]
+      from_year:
+        description: "backfill 시작 사업연도"
+        required: false
+        default: "2019"
       max_calls:
         description: "이번 실행 DART 호출 상한(일일 한도 20,000 안쪽)"
         required: false
-        default: "15000"
-      codes:
-        description: "codes 모드용 종목코드(쉼표 구분)"
-        required: false
+        default: "3000"
 
 permissions:
   contents: write
@@ -27,7 +28,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    timeout-minutes: 90
     defaults:
       run:
         shell: bash
@@ -46,10 +47,10 @@ jobs:
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
           MODE: ${{ inputs.mode }}
           MAXC: ${{ inputs.max_calls }}
-          CODES: ${{ inputs.codes }}
+          FROM: ${{ inputs.from_year }}
         run: |
           mkdir -p fin_q
-          python fin_bulk.py "$MODE" --max-calls "${MAXC:-15000}" --codes "$CODES" 2>&1 | tee fin_q/last_run.log
+          python fin_bulk.py "$MODE" --max-calls "${MAXC:-3000}" --from-year "${FROM:-2019}" 2>&1 | tee fin_q/last_run.log
           exit ${PIPESTATUS[0]}
 
       - name: 결과 백업(커밋 실패에 대비)

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""fin_bulk.py - 전 종목 분기 매출·영업이익(단독, 최근 12분기) 일괄 수집 (DART fnlttSinglAcntAll)
+"""fin_bulk.py - 전 종목 분기 매출·영업이익(단독) 일괄 수집 — DART 주요계정 다중조회(fnlttMultiAcnt, 회사 100개/호출)
 
-dart_bm.py 의 검증된 로직(fetch_period/pick_fin/build_quarters)을 그대로 재사용한다.
+dart_bm.py 의 pick_fin/build_quarters 를 그대로 재사용한다(분기 단독값 = 누적차, 4Q = 사업보고서 − 3분기 누적, 불일치는 check 표시).
 모드
-  backfill  universe 중 아직 수집 안 된 종목을 처음부터 수집. 호출 예산(--max-calls)을 다 쓰면 저장하고 정상 종료 → 다음 실행이 이어서 처리
-  update    마지막 수집일(-3일 겹침)부터 오늘까지 접수된 정기보고서를 공시목록에서 찾아, 새 보고서가 있는 종목만 갱신(간격이 며칠이든 동일)
-  codes     --codes 로 지정한 종목을 강제 재수집(검증용)
+  backfill  from-year ~ 올해의 (사업연도 × 보고서 4종) 전부 조회 → 상태 전체 재구성 (약 800~1,000 호출, 수십 분)
+  update    작년~올해만 다시 조회(정정공시·새 분기 반영) → 기존 상태에 병합 (약 200 호출). 간격이 며칠이든 동일하게 동작
 입력  fin_q/universe.json  ([{code,name}])
-출력  fin_q/fin_q.json       소비용(종목별 최근 12분기 단독 매출·영업이익[억원], yoy)
-      fin_q/periods.json.gz  내부 상태(보고서 기간별 원 단위 누적/3개월 값, 접수번호) — 증분 갱신 근거
+출력  fin_q/fin_q.json       소비용(종목별 분기 단독 매출·영업이익[억원], yoy) — 저장된 전체 분기를 누적해서 내보냄
+      fin_q/periods.json.gz  내부 상태(보고서 기간별 원 단위 값, 연결/별도 구분, 접수번호)
+      fin_q/corp_map.json    종목코드→corp_code (analyze 워크플로의 cache/corp_map.json 과 충돌하지 않게 분리)
 환경  DART_API_KEY
 """
 import argparse, contextlib, datetime, gzip, io, json, os, re, sys, time
@@ -19,16 +19,17 @@ OUT = "fin_q"
 UNI = f"{OUT}/universe.json"
 PER = f"{OUT}/periods.json.gz"
 FQ = f"{OUT}/fin_q.json"
-NQ = 12
+OWN_CMAP = f"{OUT}/corp_map.json"
 KEEP = ("매출액", "영업이익")
-# pick_fin 은 전역 FIN_ITEMS/EXTRA_ITEMS 를 쓴다 → 매출·영업이익만 뽑도록 좁힌다(계정 매칭 로직은 그대로, 경고 소음만 제거)
+# pick_fin 은 전역 FIN_ITEMS/EXTRA_ITEMS 를 쓴다 → 매출·영업이익만 뽑게 좁힌다(계정 매칭 로직은 그대로, 경고 소음 제거)
 D.FIN_ITEMS = [x for x in D.FIN_ITEMS if x[0] in KEEP]
 D.EXTRA_ITEMS = []
 D.QFLOWS = list(KEEP)
 D.FLOWS = list(KEEP)
 
+REPRT = (("11013", 3), ("11012", 6), ("11014", 9), ("11011", 12))  # 1분기, 반기, 3분기, 사업
 CALLS = 0
-MAX_CALLS = 17000
+MAX_CALLS = 3000
 _orig_get = D.get
 
 
@@ -41,7 +42,7 @@ def counted_get(path, **params):
     if CALLS >= MAX_CALLS:
         raise Budget()
     CALLS += 1
-    time.sleep(0.03)
+    time.sleep(0.05)
     return _orig_get(path, **params)
 
 
@@ -56,78 +57,68 @@ def jload_gz(fp, default):
         return default
 
 
-def jsave(state, fq, meta, cmap=None):
+def jsave(state, fq, meta, cmap):
     os.makedirs(OUT, exist_ok=True)
-    if cmap:
-        own = {k: v for k, v in cmap.items() if k in state}
-        with open(OWN_CMAP, "w", encoding="utf-8") as f:
-            json.dump(own, f, ensure_ascii=False, separators=(",", ":"))
+    with open(OWN_CMAP, "w", encoding="utf-8") as f:
+        json.dump({k: v for k, v in cmap.items() if k in state}, f, ensure_ascii=False, separators=(",", ":"))
     with gzip.open(PER, "wt", encoding="utf-8") as f:
         json.dump({"meta": meta, "stocks": state}, f, ensure_ascii=False, separators=(",", ":"))
-    out = {"meta": meta, "stocks": fq}
     with open(FQ, "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+        json.dump({"meta": meta, "stocks": fq}, f, ensure_ascii=False, separators=(",", ":"))
 
 
-OWN_CMAP = f"{OUT}/corp_map.json"  # analyze 워크플로가 쓰는 cache/corp_map.json 과 충돌하지 않도록 별도 파일
-
-
-def corp_for(code, cmap, corps_holder):
+def corp_for(code, cmap, holder):
     c = cmap.get(code)
     if c:
         return c["corp_code"]
-    if corps_holder[0] is None:
-        corps_holder[0] = {x["stock_code"]: x for x in D.load_corps() if x["stock_code"]}
-    x = corps_holder[0].get(code)
+    if holder[0] is None:
+        holder[0] = {x["stock_code"]: x for x in D.load_corps() if x["stock_code"]}
+    x = holder[0].get(code)
     if x:
         cmap[code] = x
         return x["corp_code"]
     return None
 
 
-def list_reports(corp_code):
-    """정기보고서 기간별 최신 접수(정정 포함). {(연,월): {kind,rcept_no,rcept_dt}} (원문 확인 호출 없음)"""
-    today = datetime.date.today()
-    bgn = today - datetime.timedelta(days=365 * 5 + 30)
-    rows, page, total = [], 1, 1
-    while page <= total and page <= 10:
-        j = D.get_json("list.json", corp_code=corp_code, bgn_de=bgn.strftime("%Y%m%d"),
-                       end_de=today.strftime("%Y%m%d"), pblntf_ty="A", page_count=100, page_no=page)
-        rows += j.get("list") or []
-        total = int(j.get("total_page") or 1)
-        page += 1
-    return best_by_period(rows)
-
-
-def best_by_period(rows):
-    best = {}
-    for r in rows:
-        m = D.PERIODIC_RE.search(r.get("report_nm", ""))
-        if not m:
-            continue
-        key = (int(m.group(2)), int(m.group(3)))
-        r = {"kind": m.group(1), "rcept_no": r["rcept_no"], "rcept_dt": r["rcept_dt"]}
-        if key not in best or (r["rcept_dt"], r["rcept_no"]) > (best[key]["rcept_dt"], best[key]["rcept_no"]):
-            best[key] = r
-    return best
-
-
-def reprt(kind, month):
-    return "11011" if kind == "사업" else "11012" if kind == "반기" else "11013" if D.qnum(month) == 1 else "11014"
-
-
 def compact(items):
-    return {k: {"당기": v["당기"], "당기누적": v["당기누적"]} for k, v in items.items() if k in KEEP and v}
+    return {k: {"당기": v["당기"], "당기누적": v["당기누적"], "전기": v["전기"]} for k, v in items.items() if k in KEEP and v}
 
 
-def needed_keys(lk):
-    need, key = [], lk
-    for _ in range(NQ):
-        need.append(key)
-        if D.qnum(key[1]) > 1:
-            need.append(D.prev_period(*key))
-        key = D.prev_period(*key)
-    return list(dict.fromkeys(need))
+def end_month(row):
+    m = re.findall(r"(\d{4})\.(\d{2})\.(\d{2})", row.get("thstrm_dt") or "")
+    return int(m[-1][1]) if m else None
+
+
+def fetch_periods(state, by_corp, years):
+    """years 의 (보고서 4종)을 100사씩 조회해 state[code]['p'][div][key] 에 반영"""
+    corps = sorted(by_corp)
+    for year in years:
+        for rc, month in REPRT:
+            key = f"{year}.{month:02d}"
+            got = 0
+            for i in range(0, len(corps), 100):
+                batch = corps[i:i + 100]
+                j = D.get_json("fnlttMultiAcnt.json", corp_code=",".join(batch), bsns_year=str(year), reprt_code=rc)
+                rows = j.get("list") or []
+                grp = {}
+                for r in rows:
+                    grp.setdefault((r["corp_code"], r.get("fs_div")), []).append(r)
+                for (cc, div), rs in grp.items():
+                    code = by_corp.get(cc)
+                    if not code or div not in ("CFS", "OFS"):
+                        continue
+                    with contextlib.redirect_stderr(io.StringIO()):
+                        items = compact(D.pick_fin(rs))
+                    if not items:
+                        continue
+                    rec = state.setdefault(code, {"corp": cc, "p": {}, "r": {}})
+                    rec["p"].setdefault(div, {})[key] = items
+                    rec["r"][key] = rs[0].get("rcept_no")
+                    em = end_month(rs[0])
+                    if em is not None and em != month:
+                        rec["nd"] = True  # 12월 결산이 아니면 분기 환산 가정이 깨지므로 건너뜀
+                    got += 1
+            print(f"  {key}: {got}건 (호출 누계 {CALLS})", flush=True)
 
 
 def to_uk(v):
@@ -145,13 +136,18 @@ def yoy(cur, prev):
 
 
 def consumer(rec):
-    """periods 상태 → 소비용 분기 목록(최신순). yoy 는 금액으로 직접 계산"""
-    p = {tuple(map(int, k.split("."))): v for k, v in rec["p"].items()}
-    lk = max(p) if p else None
-    if not lk:
-        return None
+    """상태 → 소비용 분기 목록(최신순). 연결 우선(최신 기간에 연결이 있으면 연결, 아니면 별도). yoy 는 금액으로 직접 계산"""
+    if rec.get("nd"):
+        return {"skip": "비12월결산"}
+    P = rec["p"]
+    if not P:
+        return {"skip": "재무 없음"}
+    latest = lambda d: max(d) if d else ""
+    div = "CFS" if latest(P.get("CFS", {})) >= latest(P.get("OFS", {})) and P.get("CFS") else "OFS"
+    p = {tuple(map(int, k.split("."))): v for k, v in P[div].items()}
+    lk = max(p)
     qi = lambda k: k[0] * 4 + k[1] // 3
-    n = min(60, max(NQ, qi(lk) - qi(min(p)) + 1))  # 저장된 기간 전체(누적). 백필 직후는 12분기, 시즌마다 1분기씩 늘어난다
+    n = min(80, qi(lk) - qi(min(p)) + 1)
     qs = D.build_quarters(p, lk, 12, n=n)
     out = []
     for i, q in enumerate(qs):
@@ -163,83 +159,18 @@ def consumer(rec):
         yo, st = yoy(o, base.get("영업이익"))
         out.append({"k": q["key"], "s": to_uk(s), "o": to_uk(o), "ys": ys, "yo": yo, "st": st,
                     "how": q["how"], "chk": q["check"], "src": "DART"})
-    return {"basis": rec.get("basis"), "rd": rec.get("rd"), "q": out}
-
-
-def fetch_keys(corp_code, keys, reps, div0):
-    """keys 의 기간별 보고서 재무를 받아 compact 로 반환. (dict, div0, basis)"""
-    res, basis = {}, {}
-    for key in keys:
-        r = reps.get(key)
-        if not r:
-            continue
-        bases = (div0, "OFS" if div0 == "CFS" else "CFS") if div0 else ("CFS", "OFS")
-        buf = io.StringIO()
-        with contextlib.redirect_stderr(buf):
-            got = D.fetch_period(corp_code, key[0], reprt(r["kind"], key[1]), bases)
-        if got:
-            res[f"{key[0]}.{key[1]:02d}"] = compact(got["items"])
-            div0 = div0 or got["div"]
-            basis[f"{key[0]}.{key[1]:02d}"] = got["basis"]
-    return res, div0, basis
-
-
-def full_collect(corp_code):
-    reps = list_reports(corp_code)
-    ann = [k for k, r in reps.items() if r["kind"] == "사업"]
-    if not ann:
-        return {"skip": "사업보고서 없음"}
-    fy_end = max(ann)[1]
-    if fy_end != 12:
-        return {"skip": f"비12월결산({fy_end}월)"}
-    lk = max(reps)
-    p, div0, basis = fetch_keys(corp_code, needed_keys(lk), reps, None)
-    if not p:
-        return {"skip": "재무 응답 없음"}
-    mixed = len(set(basis.values())) > 1
-    return {"corp": corp_code, "div": div0, "basis": ("연결" if div0 == "CFS" else "별도") + ("(혼재)" if mixed else ""),
-            "r": {f"{k[0]}.{k[1]:02d}": [v["rcept_dt"], v["rcept_no"]] for k, v in reps.items()},
-            "rd": max(v["rcept_dt"] for v in reps.values()), "p": p,
-            "ts": datetime.datetime.now().strftime("%Y-%m-%d")}
-
-
-def incremental(rec, new_reps):
-    """새/정정된 보고서 기간만 다시 받는다. new_reps: {(연,월): {kind,rcept_no,rcept_dt}}"""
-    stored = {tuple(map(int, k.split("."))): v for k, v in rec["r"].items()}
-    todo = {}
-    for k, r in new_reps.items():
-        old = stored.get(k)
-        if not old or (r["rcept_dt"], r["rcept_no"]) > (old[0], old[1]):
-            todo[k] = r
-    if not todo:
-        return False
-    # kind 복원: 새 보고서는 목록의 kind 사용, 기존은 12월결산 전제로 월에서 추정(12=사업, 6=반기, 그 외=분기)
-    allreps = {k: {"kind": "사업" if k[1] == 12 else "반기" if k[1] == 6 else "분기", "rcept_no": v[1], "rcept_dt": v[0]}
-               for k, v in stored.items()}
-    allreps.update(todo)
-    lk = max(allreps)
-    keys = list(todo)
-    prevk = [D.prev_period(*k) for k in todo if D.qnum(k[1]) > 1]
-    for pk in prevk:
-        if f"{pk[0]}.{pk[1]:02d}" not in rec["p"] and pk in allreps:
-            keys.append(pk)
-    got, div0, _ = fetch_keys(rec["corp"], list(dict.fromkeys(keys)), allreps, rec["div"])
-    if not got:
-        return False
-    rec["p"].update(got)
-    rec["r"] = {f"{k[0]}.{k[1]:02d}": [v["rcept_dt"], v["rcept_no"]] for k, v in allreps.items()}
-    rec["rd"] = max(v["rcept_dt"] for v in allreps.values())
-    rec["ts"] = datetime.datetime.now().strftime("%Y-%m-%d")
-    return True  # 오래된 기간은 지우지 않고 계속 누적한다
+    if not out:
+        return {"skip": "분기값 없음"}
+    other = "OFS" if div == "CFS" else "CFS"
+    return {"basis": "연결" if div == "CFS" else "별도", "alt": bool(P.get(other)), "rd": rec["r"].get(f"{lk[0]}.{lk[1]:02d}"), "q": out}
 
 
 def main():
     global MAX_CALLS
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["backfill", "update", "codes"])
-    ap.add_argument("--max-calls", type=int, default=17000)
-    ap.add_argument("--codes", default="")
-    ap.add_argument("--since", default="", help="update 시작일 강제(YYYYMMDD). 기본: 마지막 수집일-3일")
+    ap.add_argument("mode", choices=["backfill", "update"])
+    ap.add_argument("--from-year", type=int, default=2019)
+    ap.add_argument("--max-calls", type=int, default=3000)
     a = ap.parse_args()
     MAX_CALLS = a.max_calls
     if not D.KEY:
@@ -247,97 +178,50 @@ def main():
     uni = {x["code"]: x["name"] for x in json.load(open(UNI, encoding="utf-8"))}
     saved = jload_gz(PER, {"meta": {}, "stocks": {}})
     state, meta = saved["stocks"], saved["meta"]
-    fq = json.load(open(FQ, encoding="utf-8"))["stocks"] if os.path.exists(FQ) else {}
     cmap = {}
     for fp in (os.path.join(D.CACHE, "corp_map.json"), OWN_CMAP):
         try:
             cmap.update(json.load(open(fp, encoding="utf-8")))
         except (OSError, ValueError):
             pass
-    corps = [None]
-    started, n_new, stopped = datetime.date.today(), 0, ""
-
-    def commit_one(code, rec):
-        state[code] = rec
-        if "skip" in rec:
-            fq[code] = {"skip": rec["skip"]}
+    holder, by_corp, nocorp = [None], {}, []
+    for code in uni:
+        cc = corp_for(code, cmap, holder)
+        if cc:
+            by_corp[cc] = code
         else:
-            c = consumer(rec)
-            if c:
-                fq[code] = c
-
-    try:
-        if a.mode in ("backfill", "codes"):
-            todo = [c for c in (a.codes.split(",") if a.mode == "codes" else uni) if c in uni and (a.mode == "codes" or c not in state)]
-            print(f"[{a.mode}] 대상 {len(todo)}종목 (전체 {len(uni)}, 기수집 {len(state)})")
-            for i, code in enumerate(todo, 1):
-                cc = corp_for(code, cmap, corps)
-                if not cc:
-                    commit_one(code, {"skip": "corp_code 없음"})
-                    continue
-                try:
-                    commit_one(code, full_collect(cc))
-                except RuntimeError as e:
-                    if "020" in str(e):
-                        raise Budget()
-                    print(f"[오류] {code} {uni[code]}: {e}")
-                    continue
-                n_new += 1
-                if i % 50 == 0:
-                    meta.update(calls_last=CALLS, n=len(state))
-                    jsave(state, fq, meta, cmap)
-                    print(f"  {i}/{len(todo)} 호출 {CALLS}")
-        else:  # update
-            last = a.since or meta.get("last_scan")
-            if not last:
-                sys.exit("last_scan 없음: 먼저 backfill 이 끝나야 합니다(또는 --since).")
-            bgn = datetime.datetime.strptime(last, "%Y%m%d").date() - datetime.timedelta(days=3)
-            if not a.since and meta.get("backfill_done") is not True:
-                print("[경고] backfill 미완료 상태에서 update 실행")
-            by_corp = {state[c]["corp"]: c for c in state if "corp" in state[c]}
-            hits = {}
-            d0 = bgn
-            while d0 <= started:
-                d1 = min(d0 + datetime.timedelta(days=29), started)
-                page, total = 1, 1
-                while page <= total:
-                    j = D.get_json("list.json", bgn_de=d0.strftime("%Y%m%d"), end_de=d1.strftime("%Y%m%d"),
-                                   pblntf_ty="A", page_count=100, page_no=page)
-                    total = int(j.get("total_page") or 1)
-                    for r in j.get("list") or []:
-                        c = by_corp.get(r.get("corp_code"))
-                        if c:
-                            hits.setdefault(c, []).append(r)
-                    page += 1
-                d0 = d1 + datetime.timedelta(days=1)
-            print(f"[update] {bgn}~{started} 새 정기공시 보유 종목 {len(hits)}")
-            for code, rows in hits.items():
-                new_reps = best_by_period(rows)
-                try:
-                    if incremental(state[code], new_reps):
-                        commit_one(code, state[code])
-                        n_new += 1
-                except RuntimeError as e:
-                    if "020" in str(e):
-                        raise Budget()
-                    print(f"[오류] {code}: {e}")
-        if a.mode == "update":
-            meta["last_scan"] = started.strftime("%Y%m%d")
-    except Budget:
-        stopped = "호출 예산 소진/한도 → 저장 후 종료(다음 실행이 이어서 처리)"
-    meta["calls_last"] = CALLS
-    meta["updated"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            nocorp.append(code)
+    this_year = datetime.date.today().year
     if a.mode == "backfill":
-        meta.setdefault("backfill_start", started.strftime("%Y%m%d"))
-        meta["backfill_done"] = all(c in state for c in uni)
-        if meta["backfill_done"] and "last_scan" not in meta:
-            meta["last_scan"] = meta["backfill_start"]  # 첫 백필 시작일: 그 이후 접수분은 update 가 받는다
-    meta["n"] = len(state)
+        years, state = list(range(a.from_year, this_year + 1)), {}
+    else:
+        if not state:
+            sys.exit("상태 없음: 먼저 backfill 을 실행하세요.")
+        years = [this_year - 1, this_year]
+    print(f"[{a.mode}] 회사 {len(by_corp)}개(corp_code 없음 {len(nocorp)}) · 사업연도 {years[0]}~{years[-1]}", flush=True)
+    stopped = ""
+    try:
+        fetch_periods(state, by_corp, years)
+    except Budget:
+        stopped = "호출 예산 소진: 결과를 저장하지 않고 종료" 
+        sys.exit(f"[중단] {stopped}")
+    fq = {}
+    for code in uni:
+        if code in state:
+            fq[code] = consumer(state[code])
+        else:
+            fq[code] = {"skip": "corp_code 없음" if code in nocorp else "DART 정기보고서 없음"}
+    meta.update(last_scan=datetime.date.today().strftime("%Y%m%d"), mode=a.mode, years=[years[0], years[-1]],
+                calls_last=CALLS, updated=datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    if a.mode == "backfill":
+        meta["backfill_start"] = meta["last_scan"]
+    meta["n"] = len(fq)
     meta["n_ok"] = sum(1 for v in fq.values() if "q" in v)
     meta["n_skip"] = sum(1 for v in fq.values() if "skip" in v)
     jsave(state, fq, meta, cmap)
-    print(f"[완료] 호출 {CALLS} / 신규·갱신 {n_new} / 수집종목 {meta['n']} (정상 {meta['n_ok']}, 건너뜀 {meta['n_skip']}) "
-          f"backfill_done={meta.get('backfill_done')} {stopped}")
+    from collections import Counter
+    print("[건너뜀 사유]", dict(Counter(v["skip"] for v in fq.values() if "skip" in v)))
+    print(f"[완료] 호출 {CALLS} / 종목 {meta['n']} (정상 {meta['n_ok']}, 건너뜀 {meta['n_skip']})")
 
 
 if __name__ == "__main__":
