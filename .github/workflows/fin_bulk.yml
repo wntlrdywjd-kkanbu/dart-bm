@@ -17,6 +17,10 @@ on:
         description: "이번 실행 DART 호출 상한(일일 한도 20,000 안쪽)"
         required: false
         default: "3000"
+      max_minutes:
+        description: "시간 예산(분). 넘기면 저장하고 멈춤 → 같은 명령을 다시 실행하면 이어받음"
+        required: false
+        default: "75"
 
 permissions:
   contents: write
@@ -48,9 +52,10 @@ jobs:
           MODE: ${{ inputs.mode }}
           MAXC: ${{ inputs.max_calls }}
           FROM: ${{ inputs.from_year }}
+          MAXM: ${{ inputs.max_minutes }}
         run: |
           mkdir -p fin_q
-          python fin_bulk.py "$MODE" --max-calls "${MAXC:-3000}" --from-year "${FROM:-2019}" 2>&1 | tee fin_q/last_run.log
+          python fin_bulk.py "$MODE" --max-calls "${MAXC:-3000}" --from-year "${FROM:-2019}" --max-minutes "${MAXM:-75}" 2>&1 | tee fin_q/last_run.log
           exit ${PIPESTATUS[0]}
 
       - name: 결과 백업(커밋 실패에 대비)
