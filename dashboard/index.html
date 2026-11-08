@@ -736,6 +736,11 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
   function researchBlock(R) {
     var rp = R.reports, rec = rp.filter(function (r) { return !r.old; }), tps = rec.filter(function (r) { return r.tp; });
     var last = rp[0];
+    if (!rp.length) {
+      var h = "<section class='card sec' id='research'><div class='q'>증권사 리포트 상세 (비공개 화면)</div><h2 class='vd'>최근 12개월 증권사 리포트 없음 — 공시 실적만 표시</h2>";
+    if (R.forecast_check && R.forecast_check.length) h += "<h3>전망 vs 실제 (매출·영업이익, 억원)</h3><div class='scroll'><table><thead><tr><th>연도</th><th>출처</th><th class='n'>매출</th><th class='n'>영업이익</th><th class='n'>영업이익률</th></tr></thead><tbody>" + R.forecast_check.map(function (f) { return "<tr" + (f.act ? " style='font-weight:600'" : "") + "><td>" + esc(f.y) + "</td><td>" + esc(f.src) + "</td><td class='n'>" + (f.rev == null ? "–" : f.rev.toLocaleString("ko-KR")) + "</td><td class='n'>" + (f.op == null ? "–" : f.op.toLocaleString("ko-KR")) + "</td><td class='n'>" + (f.op == null || f.rev == null ? "–" : (f.op / f.rev * 100).toFixed(1) + "%") + "</td></tr>"; }).join("") + "</tbody></table></div>";
+      return h + "<div class='meta'>" + esc(R.caveat || "") + " " + esc(R.note || "") + " 갱신 " + esc(R.updated || "") + "</div></section>";
+    }
     var hd = tps.length
       ? esc(rec.length) + "건의 최근 리포트: 목표가 " + tps.slice().reverse().map(function (r) { return r.tp.toLocaleString("ko-KR"); }).filter(function (v, i, arr) { return i === 0 || v !== arr[i - 1]; }).join(" → ") + "원" + (function () { var o = R.op26 || []; if (o.length < 2) return ""; var a = o[0].v, b = o[o.length - 1].v; return b > a * 1.05 ? ", 올해 영업이익 추정은 계속 상향" : b < a * 0.95 ? ", 올해 영업이익 추정은 계속 하향" : ", 올해 영업이익 추정은 큰 변화 없음"; })()
       : esc(rec.length) + "건의 최근 리포트, 투자의견·목표가를 제시한 곳은 없음(전부 NR)";
