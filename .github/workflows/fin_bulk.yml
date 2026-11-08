@@ -12,7 +12,7 @@ on:
       max_calls:
         description: "이번 실행 DART 호출 상한(일일 한도 20,000 안쪽)"
         required: false
-        default: "17000"
+        default: "15000"
       codes:
         description: "codes 모드용 종목코드(쉼표 구분)"
         required: false
@@ -49,14 +49,28 @@ jobs:
           CODES: ${{ inputs.codes }}
         run: |
           mkdir -p fin_q
-          python fin_bulk.py "$MODE" --max-calls "${MAXC:-17000}" --codes "$CODES" 2>&1 | tee fin_q/last_run.log
+          python fin_bulk.py "$MODE" --max-calls "${MAXC:-15000}" --codes "$CODES" 2>&1 | tee fin_q/last_run.log
           exit ${PIPESTATUS[0]}
+
+      - name: 결과 백업(커밋 실패에 대비)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fin_q-${{ github.run_id }}
+          path: fin_q
+          retention-days: 7
 
       - name: 결과 커밋
         if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add fin_q cache/corp_map.json
-          git diff --cached --quiet || git commit -m "fin_bulk: ${{ inputs.mode }}"
-          git pull -q --rebase && git push
+          git add fin_q
+          git diff --cached --quiet && exit 0
+          git commit -m "fin_bulk: ${{ inputs.mode }}"
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase && git push && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 5))
+          done
+          exit 1

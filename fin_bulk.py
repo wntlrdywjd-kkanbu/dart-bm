@@ -56,13 +56,20 @@ def jload_gz(fp, default):
         return default
 
 
-def jsave(state, fq, meta):
+def jsave(state, fq, meta, cmap=None):
     os.makedirs(OUT, exist_ok=True)
+    if cmap:
+        own = {k: v for k, v in cmap.items() if k in state}
+        with open(OWN_CMAP, "w", encoding="utf-8") as f:
+            json.dump(own, f, ensure_ascii=False, separators=(",", ":"))
     with gzip.open(PER, "wt", encoding="utf-8") as f:
         json.dump({"meta": meta, "stocks": state}, f, ensure_ascii=False, separators=(",", ":"))
     out = {"meta": meta, "stocks": fq}
     with open(FQ, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+
+
+OWN_CMAP = f"{OUT}/corp_map.json"  # analyze 워크플로가 쓰는 cache/corp_map.json 과 충돌하지 않도록 별도 파일
 
 
 def corp_for(code, cmap, corps_holder):
@@ -73,7 +80,6 @@ def corp_for(code, cmap, corps_holder):
         corps_holder[0] = {x["stock_code"]: x for x in D.load_corps() if x["stock_code"]}
     x = corps_holder[0].get(code)
     if x:
-        D.save_corp(x)
         cmap[code] = x
         return x["corp_code"]
     return None
@@ -242,10 +248,12 @@ def main():
     saved = jload_gz(PER, {"meta": {}, "stocks": {}})
     state, meta = saved["stocks"], saved["meta"]
     fq = json.load(open(FQ, encoding="utf-8"))["stocks"] if os.path.exists(FQ) else {}
-    try:
-        cmap = json.load(open(os.path.join(D.CACHE, "corp_map.json"), encoding="utf-8"))
-    except (OSError, ValueError):
-        cmap = {}
+    cmap = {}
+    for fp in (os.path.join(D.CACHE, "corp_map.json"), OWN_CMAP):
+        try:
+            cmap.update(json.load(open(fp, encoding="utf-8")))
+        except (OSError, ValueError):
+            pass
     corps = [None]
     started, n_new, stopped = datetime.date.today(), 0, ""
 
@@ -277,7 +285,7 @@ def main():
                 n_new += 1
                 if i % 50 == 0:
                     meta.update(calls_last=CALLS, n=len(state))
-                    jsave(state, fq, meta)
+                    jsave(state, fq, meta, cmap)
                     print(f"  {i}/{len(todo)} 호출 {CALLS}")
         else:  # update
             last = a.since or meta.get("last_scan")
@@ -327,7 +335,7 @@ def main():
     meta["n"] = len(state)
     meta["n_ok"] = sum(1 for v in fq.values() if "q" in v)
     meta["n_skip"] = sum(1 for v in fq.values() if "skip" in v)
-    jsave(state, fq, meta)
+    jsave(state, fq, meta, cmap)
     print(f"[완료] 호출 {CALLS} / 신규·갱신 {n_new} / 수집종목 {meta['n']} (정상 {meta['n_ok']}, 건너뜀 {meta['n_skip']}) "
           f"backfill_done={meta.get('backfill_done')} {stopped}")
 
