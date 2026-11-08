@@ -378,5 +378,10 @@
 "corp_code": "00126308",
 "corp_name": "삼성E&A",
 "stock_code": "028050"
+},
+"006400": {
+"corp_code": "00126362",
+"corp_name": "삼성SDI",
+"stock_code": "006400"
 }
 }
