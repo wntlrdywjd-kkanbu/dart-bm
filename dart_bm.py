@@ -257,6 +257,17 @@ def pick_fin(rows):
         if not found and label in ("재고자산", "매출채권"):
             names = [r.get("account_nm") for r in rows if r.get("sj_div") in divs][:60]
             print(f"[경고] {label} 계정 못 찾음. BS 계정: {names}", file=sys.stderr)
+        if not found and label == "매출액":  # IFRS17 보험사(서울보증보험): 보험수익+재보험수익+투자영업수익 합을 영업수익으로 본다(투자영업수익만 잡히던 오류)
+            ins_nm = {"보험수익", "재보험수익", "투자영업수익"}
+            ins = [r for r in rows if r.get("sj_div") in divs and norm(r.get("account_nm")) in ins_nm]
+            if any(norm(r.get("account_nm")) == "보험수익" for r in ins):
+                def _sum(k):
+                    vs = [to_int(r.get(k)) for r in ins]
+                    return None if all(v is None for v in vs) else sum(v for v in vs if v is not None)
+                found = {"당기": _sum("thstrm_amount"), "전기": _sum("frmtrm_amount"), "당기누적": _sum("thstrm_add_amount"),
+                         "전기누적": _sum("frmtrm_add_amount"), "전전기": _sum("bfefrmtrm_amount"),
+                         "account_nm": "영업수익(보험수익+재보험수익+투자영업수익, 계산)"}
+                print("[안내] 보험사 영업수익 합산: " + ",".join(sorted({norm(r.get('account_nm')) for r in ins})), file=sys.stderr)
         if not found and label == "매출액":  # 계정명이 표준과 다른 보고서: IS 첫 '수익/매출' 계열 행으로 대체
             for r in rows:
                 nm = norm(r.get("account_nm"))
