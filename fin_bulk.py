@@ -110,6 +110,9 @@ def apply_rows(state, by_corp, rows, key, month):
         if not items:
             continue
         rec = state.setdefault(code, {"corp": cc, "p": {}, "r": {}})
+        cur = rs[0].get("currency")
+        if cur and cur != "KRW":
+            rec["fc"] = cur  # 외화 보고(예: USD) — 금액을 원화로 환산하지 않으므로 건너뜀
         rec["p"].setdefault(div, {})[key] = items
         rec["r"][key] = rs[0].get("rcept_no")
         em = end_month(rs[0])
@@ -160,6 +163,8 @@ def consumer(rec):
     """상태 → 소비용 분기 목록(최신순). 연결 우선(최신 기간에 연결이 있으면 연결, 아니면 별도). yoy 는 금액으로 직접 계산"""
     if rec.get("nd"):
         return {"skip": "비12월결산"}
+    if rec.get("fc"):
+        return {"skip": f"외화보고({rec['fc']})"}
     P = rec["p"]
     if not P:
         return {"skip": "재무 없음"}
