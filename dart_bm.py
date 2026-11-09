@@ -958,11 +958,54 @@ def _seg_svc(lines):
     return None
 
 
+def _seg_rowtbl(lines):
+    """'사업부문|주요 품목|사용용도 등|당기 …' + '매출액|비율' 두 단 헤더 표(산일전기): 행마다 이름은 첫 칸,
+    값은 첫 숫자 칸(사업부문 칸이 rowspan 으로 빠진 행도 첫 칸이 이름). 총매출과 3% 이내일 때만. 다른 파서가 모두 실패했을 때만 쓴다."""
+    blocks = split_blocks(lines)
+    ctx = ""
+    for b in blocks:
+        if b["type"] == "text":
+            ctx = b["text"]
+            continue
+        rows = b["rows"]
+        if len(rows) == 1 and "단위" in rows[0]:
+            ctx = ctx + " " + rows[0]
+            continue
+        head = " ".join(rows[:2]).replace(" ", "")
+        cap = ctx + " " + (b.get("caption") or "")
+        ctx = ""
+        if len(rows) < 5 or "사업부문" not in head or "주요품목" not in head or "사용용도" not in head or "비율" not in head:
+            continue
+        mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", cap)
+        if not mu:
+            continue
+        mult = {"백만원": 1e6, "천원": 1e3, "원": 1.0}[mu.group(1)]
+        items, total = {}, None
+        for r in rows[2:]:
+            c = [x.strip() for x in r.strip().strip("|").split("|")]
+            if len(c) < 3:
+                continue
+            nm = c[0].strip()
+            k = next((i for i in range(1, len(c)) if re.match(r"^-?[\d,]+$", c[i].replace(" ", ""))), None)
+            if k is None:
+                continue
+            v = _num(c[k])
+            if v is None:
+                continue
+            if nm.replace(" ", "") in ("총매출액", "합계", "총계"):
+                total = v
+                continue
+            items[nm] = items.get(nm, 0) + v
+        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k_: v_ * mult for k_, v_ in items.items()}
+    return None
+
+
 def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
-    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines) or _seg_typecat(lines) or _seg_gubun(lines)
+    return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines) or _seg_typecat(lines) or _seg_gubun(lines) or _seg_rowtbl(lines)
 
 
 def _seg_item(lines):
