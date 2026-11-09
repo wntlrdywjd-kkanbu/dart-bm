@@ -974,7 +974,7 @@ def _seg_rowtbl(lines):
         head = " ".join(rows[:2]).replace(" ", "")
         cap = ctx + " " + (b.get("caption") or "")
         ctx = ""
-        if len(rows) < 5 or "사업부문" not in head or "주요품목" not in head or "사용용도" not in head or "비율" not in head:
+        if len(rows) < 5 or "사업부문" not in head or ("주요품목" not in head and "주요서비스" not in head) or "사용용도" not in head or "비율" not in head:
             continue
         mu = re.search(r"단위\s*[:：]?\s*(백만원|천원|원)", cap)
         if not mu:
@@ -996,7 +996,7 @@ def _seg_rowtbl(lines):
                 total = v
                 continue
             items[nm] = items.get(nm, 0) + v
-        if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
+        if len(items) >= 2 and total and (abs(sum(items.values()) - total) <= total * 0.03 or abs(sum(items.values()) - total * 100) <= sum(items.values()) * 0.03):  # 총합 칸이 억원 표기인 보고서(산일전기 FY2025)도 인정
             return {k_: v_ * mult for k_, v_ in items.items()}
     return None
 
@@ -1275,11 +1275,14 @@ def order_series(biz):
         # 잔액 1열형: '| 품목·구분 | 수주잔액 |' + 행 1~여러 개 (RFHIC: 총액만 간략 기재)
         one_bal = len(b["rows"]) >= 2 and "수주잔액" in b["rows"][0].replace(" ", "") and "수주총액" not in sh_ and "납품" not in sh_ and "당기수주" not in sh_ \
             and len([c for c in b["rows"][0].strip().strip("|").split("|") if c.strip()]) == 2
-        if len(b["rows"]) < 3 and not one_hdr and not one_bal:
+        # 헤더 1줄 + 바로 데이터 행(둘째 헤더 '금액|금액|금액' 없음; 산일전기 2025.12 이후)
+        one_row = len(b["rows"]) == 2 and "수주총액" in b["rows"][0].replace(" ", "") and "수주잔고" in b["rows"][0].replace(" ", "") \
+            and "금액" not in b["rows"][1] and len([v for v in _cellnums(b["rows"][1]) if v is not None]) >= 3
+        if len(b["rows"]) < 3 and not one_hdr and not one_bal and not one_row:
             continue
         if not ("수주잔고" in sh_ and ("수주총액" in sh_ or "기납품" in sh_ or one_hdr)) and not one_bal:
             continue
-        r0 = 1 if (one_hdr or one_bal) else 2
+        r0 = 1 if (one_hdr or one_bal or one_row) else 2
         unit = ""
         if pb and pb["type"] == "table" and len(pb["rows"]) == 1 and "단위" in pb["rows"][0]:
             unit = re.sub(r"[|\s]+", " ", pb["rows"][0]).strip()
