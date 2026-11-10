@@ -183,6 +183,8 @@ def build(rep, q20, overrides=None, semi=0.5):
         O = q20["영업이익"][i] if i is not None else None
         rows.append({"k": k, "L": L, "V": tot[costmap.V], "S": tot[costmap.S], "F": tot[costmap.F], "R": R, "O": O, "acc": acc,
                      "std": std_amt, "tc": sum(tot.values())})
+    # 비용 합계가 매출 대비 비현실적(단위·누적 파싱 오류)인 분기는 제외
+    rows = [r for r in rows if not (r["R"] and not (0.2 <= r["tc"] / r["R"] <= 3))]
     # 연속 분기 확인 후 TTM
     def consec(a, b):
         ya, ma, yb, mb = int(a[:4]), int(a[5:]), int(b[:4]), int(b[5:])

@@ -375,15 +375,30 @@ def extra(base, meta, fin):
     if len(rh) >= 4:
         rb = {o["key"]: o for o in rh}
         rl, rd, re_ = [], [], []
+        cum_ = {}  # (연도) -> 직전까지 누적 (dom, exp)
         for k_ in sorted(rb):
             y_, m_ = int(k_[:4]), int(k_[5:])
+            dm_, ex_ = rb[k_]["dom"], rb[k_]["exp"]
             if m_ == 3:
-                a_, b_ = rb[k_]["dom"], rb[k_]["exp"]
+                a_, b_ = dm_, ex_
+                cum_[y_] = (dm_, ex_)
             else:
-                pv_ = rb.get(f"{y_}.{m_-3:02d}")
-                if not pv_:
+                pc_ = cum_.get(y_)
+                if not pc_ or f"{y_}.{m_-3:02d}" not in rb:
                     continue
-                a_, b_ = rb[k_]["dom"] - pv_["dom"], rb[k_]["exp"] - pv_["exp"]
+                a_, b_ = dm_ - pc_[0], ex_ - pc_[1]
+                three_ = False
+                try:
+                    qs_ = q20["매출액"][q20["labels"].index(f"{str(y_)[2:]}.{m_ // 3}Q")]
+                    if qs_ and abs(dm_ + ex_ - qs_) < 0.05 * qs_ and abs(a_ + b_ - qs_) > 0.3 * qs_:
+                        three_ = True
+                except Exception:
+                    pass
+                if three_:  # 표가 3개월 값
+                    a_, b_ = dm_, ex_
+                    cum_[y_] = (pc_[0] + dm_, pc_[1] + ex_)
+                else:
+                    cum_[y_] = (dm_, ex_)
             if a_ < 0 or b_ < 0:
                 continue
             rl.append(f"{str(y_)[2:]}.{m_ // 3}Q"); rd.append(a_ / 1e8); re_.append(b_ / 1e8)
