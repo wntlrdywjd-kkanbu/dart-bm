@@ -24,6 +24,7 @@ def parse_table(t):
     mult = {"백만원": 1e6, "천원": 1e3, "원": 1.0}.get(mu.group(1) if mu else "천원", 1e3)
     unit_known = bool(mu)
     quarterly = any("3개월" in r for r in rows[:3])
+    three = any("매출원가" in r for r in rows[:3]) and any("판매비" in r for r in rows[:3]) and any("합계" in r for r in rows[:3][:3] if "배분" in r)
     q, cum, total = {}, {}, None
     total_first = None
     total_label = ""
@@ -43,7 +44,11 @@ def parse_table(t):
             continue
         nn = re.sub(r"\((\*+|주)\d*\)", "", re.sub(r"\s", "", name))
         is_tot = (nn.startswith(("합계", "계", "매출원가와판매비", "매출원가및판매비")) or nn.endswith("합계") or nn == "성격별비용") and not re.search(r"(급여|인건비|퇴직|복리후생)(비용)?합계$", nn)  # 기가비스: '종업원급여비용 합계'는 소계(총합계 아님)  # 테스: 합계 행이 '성격별 비용'. 한양디지텍: 합계 행이 '매출원가와 판매비와관리비'
-        if quarterly:
+        if three and quarterly and len(vals) == 6 and vals[4] is not None and vals[5] is not None:
+            a, b = vals[4] * mult, vals[5] * mult  # 판관비|매출원가|합계 3쌍 표(더블유씨피): 마지막 쌍(합계)을 쓴다
+        elif three and not quarterly and len(vals) == 3 and vals[2] is not None:
+            a = b = vals[2] * mult
+        elif quarterly:
             if len(vals) < 2 or vals[1] is None:
                 continue
             a, b = vals[0] * mult, vals[1] * mult
