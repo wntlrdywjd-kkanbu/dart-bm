@@ -65,6 +65,22 @@ else:
     chk(len(v.get("forecast_check", [])) >= 3, f"forecast_check {len(v.get('forecast_check',[]))}개(>=3)")
     _noest = all(r.get("tp") is None for r in v.get("reports", [])) and "op26" in v.get("caveat", "")
     chk(len(v.get("op26", [])) >= 1 or _noest, f"op26 {len(v.get('op26',[]))}개(>=1, 또는 추정치·목표가 전무+caveat 에 op26 사유)")
+# 증권사 추정 YoY 카드(fc.json, 2026-11-11): view 에 est 가 있으면 fc.json 필수 + 단위 점검
+try:
+    _v = v
+except NameError:
+    _v = None
+if _v and any(r.get("est") and not r.get("old") for r in _v.get("reports", [])):
+    _fp = f"{base}/fc.json" if "base" in globals() else f"out/{code}/fc.json"
+    if not os.path.exists(_fp):
+        chk(False, f"fc.json 없음 — python tools/fc_from_view.py {code} 로 초안 생성·확인 후 build_dash_data 재실행(증권사추정YoY_절차.md)")
+    else:
+        _fc = json.load(open(_fp, encoding="utf-8"))
+        _d = json.load(open(f"out/{code}/dash.json", encoding="utf-8"))
+        chk(bool(_d.get("fc")), "dash.json 에 fc 포함(없으면 fc.json 저장 후 build_dash_data 재실행)")
+        _a = _d["annual"]; _ar = (_a["매출액"][-1] or 0) / 1e8
+        _bad = [f"{e['b']} {e['y']} 매출 {e.get('rev')}" for e in _fc["est"] if not e.get("old") and e.get("rev") and _ar and not (0.2 <= e["rev"] / _ar <= 8)]
+        chk(not _bad, "fc 단위 점검(최근 연간 매출 대비 0.2~8배): " + (", ".join(_bad) if _bad else f"이상 없음({len([e for e in _fc['est'] if not e.get('old')])}건)"))
 print("\n".join("OK   " + m for m in info))
 print("\n".join("FAIL " + m for m in bad))
 print("결과:", "통과" if not bad else f"미달 {len(bad)}건 — 보강 후 DB 반영")
