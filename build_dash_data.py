@@ -524,6 +524,83 @@ def diff_md(path):
     return "\n".join(out)
 
 
+def fc_build(base, doc):
+    """out/{code}/fc.json(증권사 연간 추정, 억원)으로 연간 YoY·남은 분기 암묵 YoY 를 계산(2026-11-11). old 제외, 증권사별 최신 1건."""
+    fp = os.path.join(base, "fc.json")
+    if not os.path.exists(fp):
+        return None
+    fc = json.load(open(fp, encoding="utf-8"))
+    ann, q = doc["annual"], doc.get("q20") or {}
+    act = {}
+    for i, y in enumerate(ann["years"]):
+        yy = int(re.sub(r"\D", "", y)[:4])
+        r_, o_ = ann["매출액"][i], ann["영업이익"][i]
+        act[yy] = {"rev": r_ / 1e8 if r_ is not None else None, "op": o_ / 1e8 if o_ is not None else None}
+    latest = {}
+    for e in fc["est"]:
+        if e.get("old"):
+            continue
+        k = (e["b"], e["y"])
+        if k not in latest or e["d"] > latest[k]["d"]:
+            latest[k] = e
+    def stat(vals):
+        vals = sorted(v for v in vals if v is not None)
+        if not vals:
+            return None
+        n = len(vals); med = vals[n // 2] if n % 2 else (vals[n // 2 - 1] + vals[n // 2]) / 2
+        return {"med": round(med, 1), "lo": vals[0], "hi": vals[-1], "n": n}
+    years = sorted({y for (_, y) in latest})
+    last_act = max(act) if act else None
+    est = {}
+    for y in years:
+        if last_act and y <= last_act:
+            continue  # 이미 확정된 연도는 추정 대상 아님
+        rows = [e for (b, yy), e in latest.items() if yy == y]
+        est[y] = {"rev": stat([e.get("rev") for e in rows]), "op": stat([e.get("op") for e in rows]), "brokers": sorted(e["b"] for e in rows)}
+    def yoy(a, b):
+        if a is None or b is None:
+            return None
+        if b > 0:
+            return {"t": "pct", "v": round((a - b) / b * 100, 1)}
+        if b < 0:
+            return {"t": "loss", "v": round(a - b, 1), "turn": a > 0}  # 적자 기저: 금액 변화
+        return None
+    out_years = []
+    for y in sorted(act)[-2:]:
+        out_years.append({"y": y, "a": True, "rev": round(act[y]["rev"], 1) if act[y]["rev"] is not None else None, "op": round(act[y]["op"], 1) if act[y]["op"] is not None else None})
+    prev = {"rev": act[last_act]["rev"], "op": act[last_act]["op"]} if last_act else {}
+    for y in sorted(est)[:2]:  # 확정 다음 2개 연도만
+        e = est[y]
+        row = {"y": y, "a": False, "rev": e["rev"], "op": e["op"], "n": len((e["rev"] or e["op"] or {}) and e["brokers"]), "brokers": e["brokers"]}
+        row["yoy_rev"] = yoy(e["rev"]["med"], prev.get("rev")) if e["rev"] else None
+        row["yoy_op"] = yoy(e["op"]["med"], prev.get("op")) if e["op"] else None
+        out_years.append(row)
+        prev = {"rev": e["rev"]["med"] if e["rev"] else None, "op": e["op"]["med"] if e["op"] else None}
+    # 남은 분기 암묵 YoY: 확정 마지막 연도 다음 해(진행 중 연도)에서 확정 분기를 뺀 값
+    rem = None
+    lab = q.get("labels") or []
+    if lab and last_act:
+        cur = last_act + 1
+        qs = [(i, int(l[-2])) for i, l in enumerate(lab) if 2000 + int(l[:2]) == cur]
+        k = len(qs)
+        if 0 < k < 4 and cur in est:
+            ytd = {m: sum((q[m][i] or 0) for i, _ in qs) / 1e8 for m in ("매출액", "영업이익")}
+            prior_idx = [i for i, l in enumerate(lab) if 2000 + int(l[:2]) == cur - 1 and int(l[-2]) <= k]
+            pytd = {m: sum((q[m][i] or 0) for i in prior_idx) / 1e8 for m in ("매출액", "영업이익")} if len(prior_idx) == k else None
+            if pytd is not None and act.get(cur - 1):
+                prem = {"rev": act[cur - 1]["rev"] - pytd["매출액"], "op": act[cur - 1]["op"] - pytd["영업이익"]}
+                e = est[cur]
+                def sub(st, y0):
+                    return None if not st else {"med": round(st["med"] - y0, 1), "lo": round(st["lo"] - y0, 1), "hi": round(st["hi"] - y0, 1)}
+                rem = {"label": f"{k + 1}Q~4Q{str(cur)[2:]}E", "k": k, "ytd_rev": round(ytd["매출액"], 1), "ytd_op": round(ytd["영업이익"], 1),
+                       "rev": sub(e["rev"], ytd["매출액"]), "op": sub(e["op"], ytd["영업이익"]),
+                       "prev_rev": round(prem["rev"], 1), "prev_op": round(prem["op"], 1)}
+                rem["yoy_rev"] = yoy(rem["rev"]["med"], prem["rev"]) if rem["rev"] else None
+                rem["yoy_op"] = yoy(rem["op"]["med"], prem["op"]) if rem["op"] else None
+    all_b = sorted({e["b"] for e in latest.values()})
+    return {"asof": fc.get("asof"), "years": out_years, "rem": rem, "brokers": all_b, "listed": [e for e in fc["est"]]}
+
+
 def build(code):
     base = os.path.join(OUT, code)
     d = json.load(open(os.path.join(base, "fin.json"), encoding="utf-8"))
@@ -568,6 +645,9 @@ def build(code):
     except OSError:
         pass
     doc.update(extra(base, meta, fin))
+    _fc = fc_build(base, doc)
+    if _fc:
+        doc["fc"] = _fc
     _lp = fin.get("latest_period") or ""
     if any(h["key"] == f"{int(_lp[:4]) - 1}{_lp[4:]}" for h in (doc.get("h1only") or [])) and _lp:
         doc["yoy_latest"] = {}  # 전년동기가 반기 누적뿐이라 3개월 비교 불가

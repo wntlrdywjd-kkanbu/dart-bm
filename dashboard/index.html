@@ -61,7 +61,7 @@ svg text { fill: var(--muted); font-family: var(--mono); font-size: 11.5px; }
 svg .vt { fill: var(--ink); }
 svg .ax { stroke: var(--line); stroke-width: 1; }
 svg .b1 { fill: var(--bar1); } svg .b2 { fill: var(--bar2); } svg .b3 { fill: var(--bar3); } svg .bn { fill: var(--neg); } svg .dim { opacity: .62; }
-svg .gp { fill: var(--pos); } svg .gn { fill: var(--neg); } svg text.sm { font-size: 9.5px; }
+svg .gp { fill: var(--pos); } svg .gn { fill: var(--neg); } svg text.sm { font-size: 9.5px; } td span.gp { color: var(--pos); } td span.gn { color: var(--neg); }
 figure.chart { margin: 0; min-width: 0; } figure.chart figcaption { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 4px; } figure.chart figcaption span { font-size: 12px; color: var(--muted); }
 .leg i.b1 { background: var(--bar1); } .leg i.b2 { background: var(--bar2); } .leg i.b3 { background: var(--bar3); }
 details.card > summary { cursor: pointer; font-size: 15px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; } details.card > summary::after { content: '펼치기'; font-size: 12px; font-weight: 400; color: var(--muted); } details[open].card > summary::after { content: '접기'; } details.card[open] > summary { margin-bottom: 10px; }
@@ -303,6 +303,53 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
 
   // ------- 공통 보조
   function rich(t) { return esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"); }
+  // 증권사 추정 연간 막대(2026-11-11): 실적=꽉 찬 막대, 추정(증권사 중앙값)=빗금 막대 + 최소~최대 범위선, 막대 위 YoY
+  function fcYoy(y) {
+    if (!y) return "";
+    if (y.t === "pct") return (y.v > 0 ? "+" : "") + Math.round(y.v) + "%";
+    if (y.turn) return "흑전";
+    return y.v >= 0 ? "적자축소" : "적자확대";
+  }
+  function fcBars(title, sub, key, fc) {
+    var rows = fc.years.filter(function (r) { return r[key] != null; });
+    if (!rows.length) return "";
+    var id = "fch" + key, vals = [], i;
+    rows.forEach(function (r) { if (r.a) vals.push(r[key]); else { vals.push(r[key].med, r[key].lo, r[key].hi); } });
+    var f = frame(vals.map(function (v) { return v * 1e8; }), "억", true), n = rows.length, slot = f.pw / n, bw = Math.min(46, slot * 0.55);
+    function yy(v) { return T + f.ph - (v * 1e8 - f.mn) / (f.mx - f.mn) * f.ph; }
+    var s = "<defs><pattern id='" + id + "' width='6' height='6' patternUnits='userSpaceOnUse' patternTransform='rotate(45)'><rect width='6' height='6' style='fill:var(--surface)'/><line x1='0' y1='0' x2='0' y2='6' style='stroke:var(--bar2);stroke-width:2.5'/></pattern></defs>" + grid(f, "억"), y0 = yy(0);
+    rows.forEach(function (r, k) {
+      var cx = L + slot * k + slot / 2, est = !r.a, v = est ? r[key].med : r[key], y1 = yy(v), top = Math.min(y0, y1), h = Math.max(1.5, Math.abs(y0 - y1));
+      var lb = r.a ? "FY" + String(r.y).slice(2) : "FY" + String(r.y).slice(2) + "E";
+      s += "<text x='" + cx + "' y='" + (H - 22) + "' text-anchor='middle'>" + lb + "</text>";
+      if (est) s += "<rect x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2' style='fill:url(#" + id + ");stroke:" + (v < 0 ? "var(--neg)" : "var(--bar2)") + ";stroke-width:1.5'><title>" + esc(lb + " 증권사 " + r[key].n + "곳 중앙값 " + Math.round(v).toLocaleString("ko-KR") + "억 (범위 " + Math.round(r[key].lo).toLocaleString("ko-KR") + "~" + Math.round(r[key].hi).toLocaleString("ko-KR") + ")") + "</title></rect>";
+      else s += "<rect class='" + (v < 0 ? "bn" : "b2") + "' x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2'><title>" + esc(lb + " 실적 " + Math.round(v).toLocaleString("ko-KR") + "억") + "</title></rect>";
+      if (est && r[key].n > 1 && r[key].hi !== r[key].lo) s += "<line x1='" + cx + "' x2='" + cx + "' y1='" + yy(r[key].lo) + "' y2='" + yy(r[key].hi) + "' style='stroke:var(--ink);stroke-width:1.4'/><line x1='" + (cx - 5) + "' x2='" + (cx + 5) + "' y1='" + yy(r[key].lo) + "' y2='" + yy(r[key].lo) + "' style='stroke:var(--ink);stroke-width:1.4'/><line x1='" + (cx - 5) + "' x2='" + (cx + 5) + "' y1='" + yy(r[key].hi) + "' y2='" + yy(r[key].hi) + "' style='stroke:var(--ink);stroke-width:1.4'/>";
+      var topY = est && r[key].hi * 1e8 > v * 1e8 && v >= 0 ? yy(r[key].hi) : top;
+      s += "<text class='vt' x='" + cx + "' y='" + (v >= 0 ? topY - 4 : top + h + 11) + "' text-anchor='middle'>" + Math.round(v).toLocaleString("ko-KR") + "</text>";
+      var yo = est ? fcYoy(r["yoy_" + key]) : (k > 0 && rows[k - 1].a && rows[k - 1][key] != null ? fcYoy(fcCalc(v, rows[k - 1][key])) : "");
+      if (yo) s += "<text class='" + (yo.charAt(0) === "+" || yo === "흑전" || (yo === "적자축소") ? "gp" : "gn") + " sm' x='" + cx + "' y='" + (v >= 0 ? topY - 16 : top + h + 23) + "' text-anchor='middle'>" + yo + "</text>";
+    });
+    return chartBox(title, sub, s, title);
+  }
+  function fcCalc(a, b) { if (b > 0) return { t: "pct", v: (a - b) / b * 100 }; if (b < 0) return { t: "loss", v: a - b, turn: a > 0 }; return null; }
+  function fcHtml(fc) {
+    if (!fc || !fc.years || !fc.years.some(function (r) { return !r.a; })) return "";
+    var e0 = function (v) { return v == null ? "–" : Math.round(v).toLocaleString("ko-KR"); };
+    var rg = function (o) { return o ? e0(o.med) + "<span class='meta'> (" + e0(o.lo) + "~" + e0(o.hi) + ")</span>" : "–"; };
+    var yc = function (y) { var t = fcYoy(y); return t ? "<span class='" + (t.charAt(0) === "+" || t === "흑전" || t === "적자축소" ? "gp" : "gn") + "'>" + (y && y.t === "loss" && !y.turn ? (y.v >= 0 ? "적자 " + e0(y.v) + "억 축소" : "적자 " + e0(-y.v) + "억 확대") : t) + "</span>" : "–"; };
+    var tr = fc.years.filter(function (r) { return !r.a; }).map(function (r) {
+      return "<tr><td>FY" + r.y + "E <span class='meta'>(" + (r.n) + "곳" + (r.n < 3 ? ", 참고용" : "") + ")</span></td><td class='n'>" + rg(r.rev) + "</td><td class='n'>" + yc(r.yoy_rev) + "</td><td class='n'>" + rg(r.op) + "</td><td class='n'>" + yc(r.yoy_op) + "</td></tr>";
+    });
+    if (fc.rem) {
+      var m = fc.rem;
+      tr.push("<tr><td>" + esc(m.label) + " <span class='meta'>(암묵, 연간 − 확정 " + m.k + "개 분기)</span></td><td class='n'>" + rg(m.rev) + "</td><td class='n'>" + yc(m.yoy_rev) + "</td><td class='n'>" + rg(m.op) + "</td><td class='n'>" + yc(m.yoy_op) + "</td></tr>");
+    }
+    var tb = "<div class='scroll'><table><thead><tr><th>기간</th><th class='n'>매출 (억, 중앙값·범위)</th><th class='n'>매출 YoY</th><th class='n'>영업이익 (억)</th><th class='n'>영업이익 YoY</th></tr></thead><tbody>" + tr.join("") + "</tbody></table></div>";
+    var remNote = fc.rem ? " 남은 분기 암묵값은 확정 누적(매출 " + e0(fc.rem.ytd_rev) + "억·영업이익 " + e0(fc.rem.ytd_op) + "억)을 연간 추정에서 뺀 값이고 비교 기준은 전년 같은 기간(매출 " + e0(fc.rem.prev_rev) + "억·영업이익 " + e0(fc.rem.prev_op) + "억)이라 분기 배분 가정이 들어가지 않습니다." : "";
+    return "<h3 style='margin:18px 0 6px'>증권사 추정으로 본 앞으로의 성장</h3><div class='charts'>" + fcBars("매출 · 연간 실적과 추정", "억원 · 빗금=증권사 중앙값, 세로선=최소~최대, 위 %=전년 대비", "rev", fc) + fcBars("영업이익 · 연간 실적과 추정", "억원 · 빗금=증권사 중앙값, 세로선=최소~최대", "op", fc) + "</div>" + tb +
+      "<div class='meta'>증권사 " + fc.brokers.length + "곳(" + esc(fc.brokers.join("·")) + ")의 최신 리포트를 증권사별 1건씩 반영했고 구판(old)은 뺐습니다. 3곳 미만이면 참고용입니다. 추정치는 부정확하며 이 대시보드의 목표주가가 아닙니다. 영업이익이 적자일 때는 %가 아니라 적자 금액 변화로 표시합니다." + remNote + "</div>";
+  }
   function preOf(a, w) { var n = a.length, r = []; for (var k = 0; k < 4; k++) { var j = n - w - 4 + k; r.push(j >= 0 && j < n - w ? a[j] : null); } return r; }
   function lastN(a, n) { return a.slice(Math.max(0, a.length - n)); }
   function ok(v) { return v != null && isFinite(v); }
@@ -559,7 +606,7 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
       barOne("영업이익 · 분기", "억원 · 단독 3개월", lastN(q.labels, 12), lastN(q.영업이익, 12), "억", true, preOf(q.영업이익, 12)) +
       lineMulti("영업이익률 · 분기", "영업이익 ÷ 매출액", q.labels, [{ n: "영업이익률", c: "var(--s1)", v: qv }]) +
       barOne("당기순이익 · 분기", "억원 · 단독 3개월", lastN(q.labels, 12), lastN(q.당기순이익, 12), "억", true, preOf(q.당기순이익, 12)) +
-      "</div><div class='meta'>분기 값은 누적에서 계산한 단독 3개월(4Q = 연간 − 3Q 누적). 마지막 막대가 최신 분기이고 나머지는 옅게 표시합니다.</div>");
+      "</div><div class='meta'>분기 값은 누적에서 계산한 단독 3개월(4Q = 연간 − 3Q 누적). 마지막 막대가 최신 분기이고 나머지는 옅게 표시합니다.</div>" + fcHtml(s.fc));
 
     // 3 비용·마진
     var gm = q.매출총이익.map(function (v, k) { return div(v, q.매출액[k]); }), nm = q.당기순이익.map(function (v, k) { return div(v, q.매출액[k]); });
