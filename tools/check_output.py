@@ -18,6 +18,15 @@ _bb = (n.get("bm") or {}).get("blocks") or []
 if _bb:  # bm 통합 섹션이 있으면 개요를 대체: 소제목 5+, 문단 6+, 표·도식 합 3+, 쟁점 3+
     chk(sum(b.get("t") == "h" for b in _bb) >= 5, f"bm 소제목 {sum(b.get('t')=='h' for b in _bb)}개(>=5)")
     chk(sum(b.get("t") in ("p", "ul") for b in _bb) >= 6, f"bm 문단·목록 {sum(b.get('t') in ('p','ul') for b in _bb)}개(>=6)")
+    # 고정 뼈대 소제목(작업절차 2-2-1): 신규·갱신 분석은 아래 소제목을 모두 포함해야 한다. 옛 양식 종목은 LEGACY 로 면제(재작성 시 목록에서 뺀다).
+    LEGACY = {"004490","005090","005290","006400","006730","020150","028050","041830","043260","062040","093520","214450","240810","317400","383310","393890","394800","489790"}
+    _hs = [b.get("x", "") for b in _bb if b.get("t") == "h"]
+    for _r in ["한 줄로", "무엇을 파나", "누구에게 파나", "어떻게 버나", "경쟁사와 위치", "해자는 있나"]:
+        _ok = any(_r in h for h in _hs)
+        if code in LEGACY and not _ok:
+            info.append(f"bm 고정 소제목 '{_r}' 없음(옛 양식 종목 면제)")
+        else:
+            chk(_ok, f"bm 고정 소제목 '{_r}' 포함")
     chk(sum(b.get("t") in ("table", "flow") for b in _bb) >= 3, f"bm 표·도식 {sum(b.get('t') in ('table','flow') for b in _bb)}개(>=3)")
     chk(len(n.get("issues") or []) >= 3, f"issues {len(n.get('issues') or [])}개(>=3)")
 else:
