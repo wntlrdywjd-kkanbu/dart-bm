@@ -566,14 +566,30 @@ def fc_build(base, doc):
             return {"t": "loss", "v": round(a - b, 1), "turn": a > 0}  # 적자 기저: 금액 변화
         return None
     out_years = []
-    for y in sorted(act)[-2:]:
+    for y in sorted(act)[-3:]:  # 과거 확정 3개년
         out_years.append({"y": y, "a": True, "rev": round(act[y]["rev"], 1) if act[y]["rev"] is not None else None, "op": round(act[y]["op"], 1) if act[y]["op"] is not None else None})
+    def pair_yoy(y, key):
+        """직전 추정 연도와 같은 증권사(둘 다 낸 곳)끼리 증권사별 YoY 의 중앙값 — 증권사 구성이 연도마다 달라 생기는 착시 방지"""
+        rs = []
+        for (b, yy), e in latest.items():
+            e0 = latest.get((b, y - 1))
+            if yy == y and e0 and e.get(key) is not None and e0.get(key) is not None and e0[key] > 0:
+                rs.append((e[key] - e0[key]) / e0[key] * 100)
+        return {"t": "pct", "v": round(sorted(rs)[len(rs) // 2] if len(rs) % 2 else sum(sorted(rs)[len(rs) // 2 - 1:len(rs) // 2 + 1]) / 2, 1), "pairs": len(rs)} if rs else None
     prev = {"rev": act[last_act]["rev"], "op": act[last_act]["op"]} if last_act else {}
-    for y in sorted(est)[:2]:  # 확정 다음 2개 연도만
+    for j, y in enumerate(sorted(est)[:3]):  # 확정 다음 3개 연도, 3번째(보통 +2년)는 증권사 3곳 이상일 때만
         e = est[y]
-        row = {"y": y, "a": False, "rev": e["rev"], "op": e["op"], "n": len((e["rev"] or e["op"] or {}) and e["brokers"]), "brokers": e["brokers"]}
-        row["yoy_rev"] = yoy(e["rev"]["med"], prev.get("rev")) if e["rev"] else None
-        row["yoy_op"] = yoy(e["op"]["med"], prev.get("op")) if e["op"] else None
+        nb = max((e["rev"] or {}).get("n", 0), (e["op"] or {}).get("n", 0))
+        if nb < 2 or (j == 2 and nb < 3):
+            break
+        row = {"y": y, "a": False, "rev": e["rev"], "op": e["op"], "n": nb, "brokers": e["brokers"]}
+        if j == 0:
+            row["yoy_rev"] = yoy(e["rev"]["med"], prev.get("rev")) if e["rev"] else None
+            row["yoy_op"] = yoy(e["op"]["med"], prev.get("op")) if e["op"] else None
+        else:  # 이후 연도: 증권사별 짝지은 YoY(적자 기저는 중앙값 차이로 폴백)
+            pr, po = pair_yoy(y, "rev"), pair_yoy(y, "op")
+            row["yoy_rev"] = pr or (yoy(e["rev"]["med"], prev.get("rev")) if e["rev"] else None)
+            row["yoy_op"] = po or (yoy(e["op"]["med"], prev.get("op")) if e["op"] else None)
         out_years.append(row)
         prev = {"rev": e["rev"]["med"] if e["rev"] else None, "op": e["op"]["med"] if e["op"] else None}
     # 남은 분기 암묵 YoY: 확정 마지막 연도 다음 해(진행 중 연도)에서 확정 분기를 뺀 값
