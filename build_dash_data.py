@@ -577,12 +577,32 @@ def fc_build(base, doc):
                 rs.append((e[key] - e0[key]) / e0[key] * 100)
         return {"t": "pct", "v": round(sorted(rs)[len(rs) // 2] if len(rs) % 2 else sum(sorted(rs)[len(rs) // 2 - 1:len(rs) // 2 + 1]) / 2, 1), "pairs": len(rs)} if rs else None
     prev = {"rev": act[last_act]["rev"], "op": act[last_act]["op"]} if last_act else {}
-    for j, y in enumerate(sorted(est)[:3]):  # 확정 다음 3개 연도, 3번째(보통 +2년)는 증권사 3곳 이상일 때만
+    def revis(y, key):
+        """같은 증권사가 같은 연도 추정을 고친 이력: 최신 vs 직전 리포트. 상향/하향/동일 수와 변화 중앙값(기저>0 이면 %, 아니면 억원)"""
+        ch, pc, last_d, prev_d = [], [], None, None
+        for b in {e["b"] for e in fc["est"] if e["y"] == y}:
+            r = sorted([e for e in fc["est"] if e["b"] == b and e["y"] == y and e.get(key) is not None], key=lambda e: e["d"])
+            while r and r[-1].get("old"):
+                r.pop()  # 구판이 최신 위치에 있으면 제외(최신 비구판 리포트를 기준으로)
+            if len(r) < 2 or r[-1]["d"] == r[-2]["d"]:
+                continue
+            a, c = r[-1][key], r[-2][key]
+            ch.append(a - c)
+            pc.append((a - c) / c * 100 if c > 0 else None)
+            last_d = max(last_d or r[-1]["d"], r[-1]["d"]); prev_d = min(prev_d or r[-2]["d"], r[-2]["d"])
+        if not ch:
+            return None
+        md = lambda v: sorted(v)[len(v) // 2] if len(v) % 2 else sum(sorted(v)[len(v) // 2 - 1:len(v) // 2 + 1]) / 2
+        med = {"t": "pct", "v": round(md(pc), 1)} if all(x is not None for x in pc) else {"t": "amt", "v": round(md(ch), 1)}
+        return {"up": sum(1 for x in ch if x > 0.5), "dn": sum(1 for x in ch if x < -0.5), "n": len(ch), "med": med, "since": prev_d, "last": last_d}
+    last_y = last_act
+    for j, y in enumerate(sorted(est)[:3]):  # 확정 다음 3개 연도. 개수 하한 없음(1곳이어도 표기, 곳 수·범위로 신뢰도 표시), 중간 연도가 비면 중단
         e = est[y]
         nb = max((e["rev"] or {}).get("n", 0), (e["op"] or {}).get("n", 0))
-        if nb < 2 or (j == 2 and nb < 3):
+        if nb < 1 or (last_y is not None and y != last_y + 1):
             break
-        row = {"y": y, "a": False, "rev": e["rev"], "op": e["op"], "n": nb, "brokers": e["brokers"]}
+        last_y = y
+        row = {"y": y, "a": False, "rev": e["rev"], "op": e["op"], "n": nb, "brokers": e["brokers"], "rv_rev": revis(y, "rev"), "rv_op": revis(y, "op")}
         if j == 0:
             row["yoy_rev"] = yoy(e["rev"]["med"], prev.get("rev")) if e["rev"] else None
             row["yoy_op"] = yoy(e["op"]["med"], prev.get("op")) if e["op"] else None

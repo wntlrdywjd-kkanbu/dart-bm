@@ -321,7 +321,7 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
     rows.forEach(function (r, k) {
       var cx = L + slot * k + slot / 2, est = !r.a, v = est ? r[key].med : r[key], y1 = yy(v), top = Math.min(y0, y1), h = Math.max(1.5, Math.abs(y0 - y1));
       var lb = r.a ? "FY" + String(r.y).slice(2) : "FY" + String(r.y).slice(2) + "E";
-      s += "<text x='" + cx + "' y='" + (H - 22) + "' text-anchor='middle'>" + lb + "</text>";
+      s += "<text x='" + cx + "' y='" + (H - 22) + "' text-anchor='middle'>" + lb + "</text>" + (est && r.n < 3 ? "<text class='sm' x='" + cx + "' y='" + (H - 10) + "' text-anchor='middle' style='fill:var(--muted)'>" + r.n + "곳</text>" : "");
       if (est) s += "<rect x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2' style='fill:url(#" + id + ");stroke:" + (v < 0 ? "var(--neg)" : "var(--bar2)") + ";stroke-width:1.5'><title>" + esc(lb + " 증권사 " + r[key].n + "곳 중앙값 " + Math.round(v).toLocaleString("ko-KR") + "억 (범위 " + Math.round(r[key].lo).toLocaleString("ko-KR") + "~" + Math.round(r[key].hi).toLocaleString("ko-KR") + ")") + "</title></rect>";
       else s += "<rect class='" + (v < 0 ? "bn" : "b2") + "' x='" + (cx - bw / 2) + "' y='" + top + "' width='" + bw + "' height='" + h + "' rx='2'><title>" + esc(lb + " 실적 " + Math.round(v).toLocaleString("ko-KR") + "억") + "</title></rect>";
       if (est && r[key].n > 1 && r[key].hi !== r[key].lo) s += "<line x1='" + cx + "' x2='" + cx + "' y1='" + yy(r[key].lo) + "' y2='" + yy(r[key].hi) + "' style='stroke:var(--ink);stroke-width:1.4'/><line x1='" + (cx - 5) + "' x2='" + (cx + 5) + "' y1='" + yy(r[key].lo) + "' y2='" + yy(r[key].lo) + "' style='stroke:var(--ink);stroke-width:1.4'/><line x1='" + (cx - 5) + "' x2='" + (cx + 5) + "' y1='" + yy(r[key].hi) + "' y2='" + yy(r[key].hi) + "' style='stroke:var(--ink);stroke-width:1.4'/>";
@@ -338,17 +338,22 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
     var e0 = function (v) { return v == null ? "–" : Math.round(v).toLocaleString("ko-KR"); };
     var rg = function (o) { return o ? e0(o.med) + "<span class='meta'> (" + e0(o.lo) + "~" + e0(o.hi) + ")</span>" : "–"; };
     var yc = function (y) { var t = fcYoy(y); return t ? "<span class='" + (t.charAt(0) === "+" || t === "흑전" || t === "적자축소" ? "gp" : "gn") + "'>" + (y && y.t === "loss" && !y.turn ? (y.v >= 0 ? "적자 " + e0(y.v) + "억 축소" : "적자 " + e0(-y.v) + "억 확대") : t) + "</span>" : "–"; };
+    var rv = function (o) {
+      if (!o) return "<span class='meta'>–</span>";
+      var m = o.med, mt = m.t === "pct" ? (m.v > 0 ? "+" : "") + m.v.toFixed(1) + "%" : (m.v > 0 ? "+" : "") + e0(m.v) + "억";
+      return "<span class='" + (o.up > o.dn ? "gp" : o.dn > o.up ? "gn" : "") + "'>" + (o.up ? "▲" + o.up : "") + (o.up && o.dn ? " " : "") + (o.dn ? "▼" + o.dn : "") + (!o.up && !o.dn ? "변동없음" : "") + "</span><span class='meta'> " + mt + "</span>";
+    };
     var tr = fc.years.filter(function (r) { return !r.a; }).map(function (r) {
-      return "<tr><td>FY" + r.y + "E <span class='meta'>(" + (r.n) + "곳" + (r.n < 3 ? ", 참고용" : "") + ")</span></td><td class='n'>" + rg(r.rev) + "</td><td class='n'>" + yc(r.yoy_rev) + "</td><td class='n'>" + rg(r.op) + "</td><td class='n'>" + yc(r.yoy_op) + "</td></tr>";
+      return "<tr><td>FY" + r.y + "E <span class='meta'>(" + (r.n) + "곳" + (r.n < 3 ? ", 참고용" : "") + ")</span></td><td class='n'>" + rg(r.rev) + "</td><td class='n'>" + yc(r.yoy_rev) + "</td><td class='n'>" + rg(r.op) + "</td><td class='n'>" + yc(r.yoy_op) + "</td><td class='n'>" + rv(r.rv_op || r.rv_rev) + "</td></tr>";
     });
     if (fc.rem) {
       var m = fc.rem;
-      tr.push("<tr><td>" + esc(m.label) + " <span class='meta'>(암묵, 연간 − 확정 " + m.k + "개 분기)</span></td><td class='n'>" + rg(m.rev) + "</td><td class='n'>" + yc(m.yoy_rev) + "</td><td class='n'>" + rg(m.op) + "</td><td class='n'>" + yc(m.yoy_op) + "</td></tr>");
+      tr.push("<tr><td>" + esc(m.label) + " <span class='meta'>(암묵, 연간 − 확정 " + m.k + "개 분기)</span></td><td class='n'>" + rg(m.rev) + "</td><td class='n'>" + yc(m.yoy_rev) + "</td><td class='n'>" + rg(m.op) + "</td><td class='n'>" + yc(m.yoy_op) + "</td><td class='n'></td></tr>");
     }
-    var tb = "<div class='scroll'><table><thead><tr><th>기간</th><th class='n'>매출 (억, 중앙값·범위)</th><th class='n'>매출 YoY</th><th class='n'>영업이익 (억)</th><th class='n'>영업이익 YoY</th></tr></thead><tbody>" + tr.join("") + "</tbody></table></div>";
+    var tb = "<div class='scroll'><table><thead><tr><th>기간</th><th class='n'>매출 (억, 중앙값·범위)</th><th class='n'>매출 YoY</th><th class='n'>영업이익 (억)</th><th class='n'>영업이익 YoY</th><th class='n'>최근 수정(영업이익)</th></tr></thead><tbody>" + tr.join("") + "</tbody></table></div>";
     var remNote = fc.rem ? " 남은 분기 암묵값은 확정 누적(매출 " + e0(fc.rem.ytd_rev) + "억·영업이익 " + e0(fc.rem.ytd_op) + "억)을 연간 추정에서 뺀 값이고 비교 기준은 전년 같은 기간(매출 " + e0(fc.rem.prev_rev) + "억·영업이익 " + e0(fc.rem.prev_op) + "억)이라 분기 배분 가정이 들어가지 않습니다." : "";
     return "<h3 style='margin:18px 0 6px'>증권사 추정으로 본 앞으로의 성장</h3><div class='charts'>" + fcBars("매출 · 연간 실적과 추정", "억원 · 빗금=증권사 중앙값, 세로선=최소~최대, 위 %=전년 대비", "rev", fc) + fcBars("영업이익 · 연간 실적과 추정", "억원 · 빗금=증권사 중앙값, 세로선=최소~최대", "op", fc) + "</div>" + tb +
-      "<div class='meta'>증권사 " + fc.brokers.length + "곳(" + esc(fc.brokers.join("·")) + ")의 최신 리포트를 증권사별 1건씩 반영했고 구판(old)은 뺐습니다. 3곳 미만이면 참고용입니다. 추정치는 부정확하며 이 대시보드의 목표주가가 아닙니다. 영업이익이 적자일 때는 %가 아니라 적자 금액 변화로 표시합니다." + remNote + "</div>";
+      "<div class='meta'>증권사 " + fc.brokers.length + "곳(" + esc(fc.brokers.join("·")) + ")의 최신 리포트를 증권사별 1건씩 반영했고 구판(old)은 뺐습니다. 1~2곳뿐인 연도는 참고용이라 막대 아래 곳 수를 적었습니다. 최근 수정은 같은 증권사의 직전 리포트와 최신 리포트를 비교한 것(▲상향 ▼하향, 숫자는 변화 중앙값)이고 직전 리포트가 없으면 비워 둡니다. 추정치는 부정확하며 이 대시보드의 목표주가가 아닙니다. 영업이익이 적자일 때는 %가 아니라 적자 금액 변화로 표시합니다." + remNote + "</div>";
   }
   function preOf(a, w) { var n = a.length, r = []; for (var k = 0; k < 4; k++) { var j = n - w - 4 + k; r.push(j >= 0 && j < n - w ? a[j] : null); } return r; }
   function lastN(a, n) { return a.slice(Math.max(0, a.length - n)); }
