@@ -34,10 +34,10 @@ else:
 hide = set(n.get("hide") or [])
 _dn = (json.load(open(f"out/{code}/dash.json", encoding="utf-8")) if os.path.exists(f"out/{code}/dash.json") else {}).get("notes")
 chk(_dn == n, "dash.json 의 notes 가 notes.json 과 일치(불일치면 build_dash_data 재실행 — 사업서술·요약 누락 방지)")
-need = {"sales": 3, "cost": 3, "cm": 3, "bs": 2, "cf": 2, "div": 1, "ins": 2, "capex": 2, "region": 2, "seg": 2, "orders": 2, "ctr": 2}
+need = {"sales": 3, "cost": 3, "cm": 3, "bs": 2, "cf": 2, "div": 1, "ins": 2, "capex": 2, "region": 2, "seg": 2, "orders": 2, "ctr": 2, "invrev": 2}
 dash = json.load(open(f"out/{code}/dash.json", encoding="utf-8")) if os.path.exists(f"out/{code}/dash.json") else {}
 have = {"sales": 1, "cost": "cost" in dash, "cm": "cost" in dash, "bs": 1, "cf": 1, "div": "div" in dash, "ins": "ins" in dash,
-        "capex": "capex" in dash, "region": "region" in dash, "seg": "seg" in dash, "orders": bool((dash.get("orders") or {}).get("tables") or dash.get("orders", {}).get("series")), "ctr": "ctr" in dash}
+        "capex": "capex" in dash, "region": "region" in dash, "seg": "seg" in dash, "orders": bool((dash.get("orders") or {}).get("tables") or dash.get("orders", {}).get("series")), "ctr": "ctr" in dash, "invrev": "invrev" in dash}
 for k, mn in need.items():
     if k in hide or not have.get(k):
         continue

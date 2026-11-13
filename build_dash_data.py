@@ -142,12 +142,13 @@ def extra(base, meta, fin):
     for k in ["자산총계", "부채총계", "자본총계", "유동자산", "비유동자산", "유동부채", "비유동부채", "이익잉여금", "자본금", "현금및현금성자산", "재고자산", "매출채권"]:
         bs[k] = [((pr[p].get(k) or {}).get("당기")) for p in pk]
     ex["bs"] = bs
-    # 재고자산-매출 지연 상관 차트(notes.invrev=true 인 종목만; 네오티스 2026-11-13 첫 적용)
+    # 재고자산-매출 지연 상관 차트(2026-11-13 표준 분석 편입: 재고 데이터가 6분기 이상이면 자동 생성, notes.invrev=false 로 끔)
     try:
         _nv = json.load(open(os.path.join(base, "notes.json"), encoding="utf-8")) or {}
     except Exception:
         _nv = {}
-    if _nv.get("invrev"):
+    _invq = [((((fin.get("periods_raw") or {}).get(_k) or {}).get("재고자산") or {}).get("당기")) for _k in q20["keys"]]
+    if _nv.get("invrev") is not False and sum(v is not None for v in _invq) >= 6:
         _lab = q20["labels"]
         _rev = [(v / 1e8 if v is not None else None) for v in q20["매출액"]]
         _inv = []
