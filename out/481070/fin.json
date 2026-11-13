@@ -9,7 +9,7 @@
     "latest_report_nm": "분기보고서 (2026.09)",
     "latest_rcept_no": "20261113001532",
     "latest_rcept_dt": "20261113",
-    "generated_at": "2026-11-13T10:38:21"
+    "generated_at": "2026-11-13T10:45:06"
   },
   "fin": {
     "basis": "연결",
@@ -3485,6 +3485,31 @@
           "의류 등": 3171000000.0,
           "스니커즈 등": 9975000000.0,
           "레인부츠 등": 499000000.0
+        }
+      },
+      {
+        "key": "2026.03",
+        "kind": "분기",
+        "items": {
+          "㈜에이유브랜즈": 9776000000.0,
+          "AU BRANDZ HANGZHOU TRADING Co., Ltd": 6955000000.0,
+          "AU BRANDZ JAPAN CO LTD": 1083000000.0,
+          "㈜고요웨어": 586000000.0,
+          "ZENNAR LTD": 84000000.0,
+          "기타": 1000000.0
+        }
+      },
+      {
+        "key": "2026.06",
+        "kind": "반기",
+        "items": {
+          "㈜에이유브랜즈": 26993000000.0,
+          "AU BRANDZ HANGZHOU TRADING Co., Ltd": 19351000000.0,
+          "AU Industrial Shanghai Co., Ltd": -526000000.0,
+          "AU BRANDZ JAPAN CO LTD": 1457000000.0,
+          "㈜고요웨어": 1382000000.0,
+          "ZENNAR LTD": 84000000.0,
+          "기타": 17000000.0
         }
       }
     ],

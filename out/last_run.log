@@ -3,6 +3,7 @@
 [경고] 분기보고서 (2026.09) 원문 실패: 원문이 ZIP이 아님: <?xml version="1.0" encoding="UTF-8" standalone="yes"?><result><status>014</status><message>파일이 존재하지 않습니다.</message></result>
 [경고] 주석 원문 덤프 실패: File is not a zip file
 [경고] 비용 주석 20261113001532 실패: 원문이 ZIP이 아님: <?xml version="1.0" encoding="UTF-8" standalone="yes"?><result><status>014</status><message>파일이 존재하지 않습니다.</message></result>
+corp_code 캐시 사용
 대상: 에이유브랜즈 (481070) corp_code=01803927
 BM 서술: 사업보고서 (2025.12) / 최신: 분기보고서 (2026.09) (접수일 20261113)
 정기보고서 목록: 2026.09분기, 2026.06반기, 2026.03분기, 2025.12사업, 2025.09분기, 2025.06반기, 2025.03분기, 2024.12사업
@@ -17,7 +18,7 @@ BM 서술: 사업보고서 (2025.12) / 최신: 분기보고서 (2026.09) (접수
 가동률 0개 보고서
 비용 주석 원문 7개 보고서
 수주잔고 0개 보고서
-부문 비중 4개 보고서
+부문 비중 6개 보고서
 elestock status=000 msg=정상 rows=8
 내부자 보고 8건
 공급계약 공시 0건 중 금액 파싱 0건
