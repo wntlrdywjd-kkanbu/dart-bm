@@ -1038,8 +1038,41 @@ def _seg_pumok(lines):
     return None
 
 
+def _seg_entity(lines):
+    """'매출 유형 | 회사명 | 브랜드 | 품목 | 당기 매출액 | 비중 | 전기… ' 표(법인별 매출, 에이유브랜즈 2026~; 매출유형 칸은 첫 행만 있어 9·10칸 행이 섞임).
+    이름=회사명(뒤에서 9번째 칸), 값=뒤 6칸 중 첫 칸. 합계와 3% 이내일 때만(법인간 내부거래 음수 포함)."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|"):
+            continue
+        hdr = [c.replace(" ", "") for c in ln.strip().strip("|").split("|")]
+        if hdr[:4] != ["매출유형", "회사명", "브랜드", "품목"]:
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, k = {}, None, i + 1
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            if c and re.sub(r"\s+", "", c[0]) in ("합계", "계", "총계"):
+                total = _num(c[1]) if len(c) > 1 else None
+                continue
+            if len(c) not in (9, 10):
+                continue
+            v = _num(re.sub(r"^\((.+)\)$", r"-\1", c[-6]))
+            if v is None:
+                continue
+            nm = c[-9]
+            if nm and nm not in ("-", "별첨"):
+                items[nm] = items.get(nm, 0) + v
+        if len(items) >= 3 and total and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k2: v * mult for k2, v in items.items()}
+    return None
+
+
 def seg_from_lines(lines):
-    r = _seg_rowspan(lines) or _seg_pumok(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
+    r = _seg_rowspan(lines) or _seg_pumok(lines) or _seg_entity(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
     return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines) or _seg_typecat(lines) or _seg_gubun(lines) or _seg_rowtbl(lines)
