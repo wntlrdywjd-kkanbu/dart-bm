@@ -662,6 +662,20 @@ def _seg_wide(lines):
             items[name] = items.get(name, 0) + amt
         if len(items) >= 2 and total and abs(sum(items.values()) - total) <= total * 0.03:
             return {k2: v * mult for k2, v in items.items()}
+        # 품목·구체적용도 칸이 따로 있고 부문 칸만 병합돼 행마다 칸 수가 다른 표(대주전자재료): 용도 칸('- …') 바로 앞 칸이 품목, 바로 뒤 칸이 당기 금액
+        items2, total2 = {}, None
+        for c in rows:
+            if c and re.sub(r"\s+", "", c[0]) in ("합계", "계", "총계"):
+                total2 = next((float(v.replace(",", "")) for v in c[1:] if re.fullmatch(r"-?[\d,]+", v)), None)
+                continue
+            u = next((x for x, v in enumerate(c) if x >= 1 and v.startswith("-") and len(v) > 3 and x + 1 < len(c) and re.fullmatch(r"-?[\d,]+", c[x + 1])), None)
+            if u is None:
+                continue
+            nm = c[u - 1]
+            if nm and nm not in ("-", "제품상품"):
+                items2[nm] = items2.get(nm, 0) + float(c[u + 1].replace(",", ""))
+        if len(items2) >= 2 and total2 and abs(sum(items2.values()) - total2) <= total2 * 0.03:
+            return {k2: v * mult for k2, v in items2.items()}
         return None
     return None
 
@@ -1084,6 +1098,8 @@ def seg_from_lines(lines):
     r = _seg_rowspan(lines) or _seg_pumok(lines) or _seg_entity(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
+    if r and len(r) < 2:  # 부문이 1개뿐이라 품목 단위 표가 따로 있을 수 있음(대주전자재료: 부문 '전자재료' 아래 품목·용도 칸 표) → 품목 표를 먼저 시도
+        r = _seg_wide(lines) or r
     return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines) or _seg_typecat(lines) or _seg_gubun(lines) or _seg_rowtbl(lines)
 
 
