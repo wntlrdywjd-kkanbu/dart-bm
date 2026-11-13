@@ -1001,8 +1001,45 @@ def _seg_rowtbl(lines):
     return None
 
 
+def _seg_pumok(lines):
+    """'부문 | 품목 | 구체적 용도 | 매출액 | 비중' 표(부문 칸이 앞 행과 병합돼 행마다 칸 수가 다름, LIG아큐버).
+    5칸 행=부문+품목, 4칸 행=품목 또는 (이름에 '부문'이 든) 새 부문(품목 없이 부문 한 줄: 오토모티브). 품목별 금액, 합계와 3% 이내일 때만."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|"):
+            continue
+        hdr = [c.replace(" ", "") for c in ln.strip().strip("|").split("|")]
+        if hdr != ["부문", "품목", "구체적용도", "매출액", "비중"]:
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, k, has_div = {}, None, i + 1, False
+        while k < len(lines) and lines[k].startswith("|"):
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            k += 1
+            if c and re.sub(r"\s+", "", c[0]) in ("합계", "계", "총계"):
+                total = _num(c[-2]) if len(c) >= 2 else None
+                continue
+            if len(c) not in (4, 5) or _num(c[-2]) is None:
+                continue
+            amt = _num(c[-2])
+            if len(c) == 5:
+                nm = c[1]
+            elif "부문" in c[0]:
+                nm = re.sub(r"\s*사업부문$|\s*부문$", "", c[0]).strip() or c[0]
+                has_div = True
+            else:
+                nm = c[0]
+            if nm and nm not in ("-", "별첨"):
+                items[nm] = items.get(nm, 0) + amt
+        if len(items) >= 3 and total and has_div and abs(sum(items.values()) - total) <= total * 0.03:
+            return {k2: v * mult for k2, v in items.items()}
+    return None
+
+
 def seg_from_lines(lines):
-    r = _seg_rowspan(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
+    r = _seg_rowspan(lines) or _seg_pumok(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
     return r or _seg_inline(lines) or _seg_product(lines) or _seg_wide(lines) or _seg_types(lines) or _seg_export(lines) or _seg_domexp(lines) or _seg_item(lines) or _seg_svc(lines) or _seg_paren(lines) or _seg_typecat(lines) or _seg_gubun(lines) or _seg_rowtbl(lines)
