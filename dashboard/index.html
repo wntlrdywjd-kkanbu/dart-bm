@@ -678,6 +678,22 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
       lineMulti("부채비율", "부채 ÷ 자본 · 100% 이하 초록 띠, 200% 이상 노랑 띠(참고선, 업종별 상이)", bs.labels, [{ n: "부채비율", c: "var(--s1)", v: dr }], { bands: [{ from: 0, to: 100, c: "var(--pos)" }, { from: 200, to: 1e6, c: "var(--warn)" }] }) +
       lineMulti("유동비율", "유동자산 ÷ 유동부채 · 150% 이상 초록 띠, 100% 이하 노랑 띠(참고선)", bs.labels, [{ n: "유동비율", c: "var(--s1)", v: cr }], { bands: [{ from: 150, to: 1e6, c: "var(--pos)" }, { from: 0, to: 100, c: "var(--warn)" }] }) + "</div>");
 
+    // 4-1 재고자산과 매출 (notes.invrev 종목만)
+    var iv = s.invrev;
+    if (iv && iv.labels && iv.labels.length) {
+      var il = iv.labels.length - 1, kbest = -1, kv = 0;
+      iv.lag_yoy.forEach(function (r, k) { if (ok(r) && Math.abs(r) > Math.abs(kv)) { kv = r; kbest = k; } });
+      var kk = kbest >= 0 ? iv.ks[kbest] : 0;
+      var lagTxt = kbest < 0 ? "뚜렷한 지연 관계는 없습니다" : kk > 0 ? "재고가 매출보다 " + kk + "분기 앞서 움직일 때 상관이 가장 크고(" + kv.toFixed(2) + ")" : kk < 0 ? "재고가 매출보다 " + (-kk) + "분기 뒤따를 때 상관이 가장 크고(" + (kv > 0 ? "+" : "") + kv.toFixed(2) + ")" : "같은 분기 상관이 가장 크고(" + kv.toFixed(2) + ")";
+      h += sec(s, "invrev", "재고가 쌓이면 매출이 따라오나, 매출을 뒤따라 쌓이나", iv.labels[il] + " 재고자산 **" + Math.round(iv.inv[il]).toLocaleString("ko-KR") + "억**, 분기 매출의 **" + pct(iv.ratio[il], 0) + "**. 전년 동기 대비 재고 " + (iv.inv_yoy[il] > 0 ? "+" : "") + Math.round(iv.inv_yoy[il]) + "% vs 매출 " + (iv.rev_yoy[il] > 0 ? "+" : "") + Math.round(iv.rev_yoy[il]) + "%. YoY 기준 " + lagTxt + " 표본 " + iv.n_yoy[kbest < 0 ? 3 : kbest] + "개라 참고용입니다.",
+        "<div class='charts'>" + barOne("매출액", "분기 · 억원 · 막대 위 % = 전년 동기 대비", iv.labels, iv.rev.map(function (v) { return v == null ? null : v * 1e8; }), "억", true, []) +
+        barOne("재고자산 (분기말)", "분기말 순재고자산 · 억원 · 막대 위 % = 전년 동기 대비", iv.labels, iv.inv.map(function (v) { return v == null ? null : v * 1e8; }), "억", true, []) +
+        lineMulti("전년 동기 대비: 재고 vs 매출", "% · 재고가 매출보다 먼저 꺾이거나 뒤따르는지 본다", iv.labels, [{ n: "매출 YoY", c: "var(--s1)", v: iv.rev_yoy }, { n: "재고자산 YoY", c: "var(--s2)", v: iv.inv_yoy }]) +
+        lineMulti("재고자산 ÷ 분기 매출", "% · 높을수록 같은 매출 대비 재고 부담이 큼", iv.labels, [{ n: "재고/분기 매출", c: "var(--s3)", v: iv.ratio }]) +
+        barOne("지연 상관 (YoY)", "상관계수×100 · +1Q는 재고가 매출보다 1분기 앞 · −1Q는 1분기 뒤따름 · 표본 " + Math.min.apply(null, iv.n_yoy) + "~" + Math.max.apply(null, iv.n_yoy) + "개", iv.ks.map(function (k) { return (k > 0 ? "+" : k < 0 ? "−" : "") + Math.abs(k) + "Q"; }), iv.lag_yoy.map(function (r) { return ok(r) ? Math.round(r * 100) : null; }), "%", false, []) + "</div>" +
+        "<div class='meta'>상관은 인과가 아니라 같이 움직인 정도입니다. 재고 · 매출은 DART 분기 값이고 YoY는 4분기 전과 비교합니다. 표본이 적고 구간(2022~23 매출 감소, 2025~26 동반 증가)에 따라 부호가 바뀔 수 있습니다.</div>");
+    }
+
     // 5 현금흐름
     var cf = s.cf || {}, fy = cf.연간, lt = cf.최신, wf = function (c) { return c && c.워터폴 ? waterfall("순이익이 현금이 되기까지 · " + c.label, "억원", [{ n: "순이익", v: c.워터폴.순이익, total: true }, { n: "비현금 조정", v: c.워터폴.조정 }, { n: "운전자본 변동", v: c.워터폴.운전자본 }, { n: "이자·세금·기타", v: c.워터폴["이자·세금·기타"] }, { n: "영업현금", v: c.워터폴.영업현금, total: true }]) : ""; };
     var br = function (c) { return c && c.기초현금 != null && c.기말현금 != null ? waterfall("현금 증감 · " + c.label, "기초 → 기말 · 억원", [{ n: "기초현금", v: c.기초현금, total: true }, { n: "영업활동", v: c.영업 }, { n: "투자활동", v: c.투자 }, { n: "재무활동", v: c.재무 }, { n: "환율 효과", v: c.환율 || 0 }, { n: "기말현금", v: c.기말현금, total: true }]) : ""; };

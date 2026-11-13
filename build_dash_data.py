@@ -142,6 +142,50 @@ def extra(base, meta, fin):
     for k in ["자산총계", "부채총계", "자본총계", "유동자산", "비유동자산", "유동부채", "비유동부채", "이익잉여금", "자본금", "현금및현금성자산", "재고자산", "매출채권"]:
         bs[k] = [((pr[p].get(k) or {}).get("당기")) for p in pk]
     ex["bs"] = bs
+    # 재고자산-매출 지연 상관 차트(notes.invrev=true 인 종목만; 네오티스 2026-11-13 첫 적용)
+    try:
+        _nv = json.load(open(os.path.join(base, "notes.json"), encoding="utf-8")) or {}
+    except Exception:
+        _nv = {}
+    if _nv.get("invrev"):
+        _lab = q20["labels"]
+        _rev = [(v / 1e8 if v is not None else None) for v in q20["매출액"]]
+        _inv = []
+        for _k in q20["keys"]:
+            _v = ((pr_all.get(_k) or {}).get("재고자산") or {}).get("당기") if (pr_all := (fin.get("periods_raw") or {})) else None
+            _inv.append(_v / 1e8 if _v is not None else None)
+
+        def _yoy(a):
+            return [(round((a[i] / a[i - 4] - 1) * 100, 1) if i >= 4 and a[i] is not None and a[i - 4] else None) for i in range(len(a))]
+
+        def _corr(a, b):
+            pr_ = [(x, y_) for x, y_ in zip(a, b) if x is not None and y_ is not None]
+            n_ = len(pr_)
+            if n_ < 6:
+                return None, n_
+            mx = sum(x for x, _ in pr_) / n_
+            my = sum(y_ for _, y_ in pr_) / n_
+            sxx = sum((x - mx) ** 2 for x, _ in pr_)
+            syy = sum((y_ - my) ** 2 for _, y_ in pr_)
+            sxy = sum((x - mx) * (y_ - my) for x, y_ in pr_)
+            return (round(sxy / (sxx * syy) ** 0.5, 2) if sxx and syy else None), n_
+
+        def _lag(a, b, k):
+            # corr(a_t, b_{t+k}): k>0 이면 a(재고)가 b(매출)보다 k분기 앞선다
+            n_ = len(a)
+            if k >= 0:
+                return _corr(a[:n_ - k], b[k:])
+            return _corr(a[-k:], b[:n_ + k])
+
+        _ry, _iy = _yoy(_rev), _yoy(_inv)
+        _ks = list(range(-3, 4))
+        ex["invrev"] = {
+            "labels": _lab, "rev": [round(v, 1) if v is not None else None for v in _rev],
+            "inv": [round(v, 1) if v is not None else None for v in _inv],
+            "ratio": [round(i / r * 100, 1) if i is not None and r else None for i, r in zip(_inv, _rev)],
+            "rev_yoy": _ry, "inv_yoy": _iy, "ks": _ks,
+            "lag_yoy": [_lag(_iy, _ry, k)[0] for k in _ks], "n_yoy": [_lag(_iy, _ry, k)[1] for k in _ks],
+            "lag_lvl": [_lag(_inv, _rev, k)[0] for k in _ks], "n_lvl": [_lag(_inv, _rev, k)[1] for k in _ks]}
     akeys = [k for k in sorted(pr) if k.endswith(".12")]
     cfd = {}
     if akeys:
