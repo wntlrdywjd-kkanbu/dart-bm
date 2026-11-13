@@ -636,9 +636,18 @@ def _seg_wide(lines):
             rows.append([x.strip() for x in lines[k].strip().strip("|").split("|")])
             k += 1
         full = max((len(c) for c in rows), default=0)
+        yrs = [int(y) for y in re.findall(r"(20\d\d)\s*년", ln)]
+        asc = len(yrs) >= 2 and yrs == sorted(yrs) and yrs[0] < yrs[-1] and "비율" not in ln and "비중" not in ln  # 오래된 해→최신 순 표(사피엔반도체): 마지막 숫자 칸이 당기
         items, total, name = {}, None, None
         for c in rows:
-            p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+", v)), None)
+            if asc:
+                if len(c) < 2 or not re.fullmatch(r"-?[\d,]+|-", c[-1]):
+                    continue
+                p = len(c) - 1
+                if c[p] == "-":
+                    c = c[:p] + ["0"]
+            else:
+                p = next((x for x, v in enumerate(c) if x > 0 and re.fullmatch(r"-?[\d,]+", v)), None)
             if p is None:
                 continue
             c0 = re.sub(r"\s+", "", c[0])
