@@ -15,6 +15,8 @@ g = n.get("glance") or {}
 chk(len(g.get("headline", "")) >= 120, f"glance.headline {len(g.get('headline',''))}자(>=120)")
 chk(len(g.get("points", [])) >= 9, f"glance.points {len(g.get('points',[]))}개(>=9)")
 _bb = (n.get("bm") or {}).get("blocks") or []
+# 해자 균형 규칙 유예(기존 분석). 해당 종목을 다음에 업데이트할 때 이 목록에서 제거하고 균형 형식으로 재작성
+BALANCE_EXEMPT = {'000990', '0088M0', '014680', '028670', '031210', '031980', '036930', '058610', '059090', '068270', '073490', '078600', '085910', '108490', '121600', '123330', '125490', '128940', '131970', '200470', '218410', '232140', '281820', '319660', '326030', '353200', '356860', '420770', '425420', '452430', '456010', '468530', '481070'}
 if _bb:  # bm 통합 섹션이 있으면 개요를 대체: 소제목 5+, 문단 6+, 표·도식 합 3+, 쟁점 3+
     chk(sum(b.get("t") == "h" for b in _bb) >= 5, f"bm 소제목 {sum(b.get('t')=='h' for b in _bb)}개(>=5)")
     chk(sum(b.get("t") in ("p", "ul") for b in _bb) >= 6, f"bm 문단·목록 {sum(b.get('t') in ('p','ul') for b in _bb)}개(>=6)")
@@ -27,6 +29,21 @@ if _bb:  # bm 통합 섹션이 있으면 개요를 대체: 소제목 5+, 문단 
             info.append(f"bm 고정 소제목 '{_r}' 없음(옛 양식 종목 면제)")
         else:
             chk(_ok, f"bm 고정 소제목 '{_r}' 포함")
+    # 해자는 있나 균형(작업절차 2-2-2): 긍정 목록·반대 목록 각각 (정량) 2+·(정성) 2+, 두 목록 항목 수 차이 1 이하, 마지막 항목은 '입증되지 않은 부분'
+    _hi = [k for k, b in enumerate(_bb) if b.get("t") == "h" and "해자는 있나" in b.get("x", "")]
+    if _hi and code not in LEGACY and code not in BALANCE_EXEMPT:
+        _tail = _bb[_hi[0] + 1:]
+        _uls = [b.get("items") or [] for b in _tail if b.get("t") == "ul"]
+        _pr = [b.get("x", "") for b in _tail if b.get("t") == "p"]
+        chk(len(_uls) >= 3 and len(_pr) >= 2, f"해자 섹션: 긍정 목록·반대 목록·입증 안 된 부분 목록 + 라벨 문단 2개(목록 {len(_uls)}개, 문단 {len(_pr)}개)")
+        if len(_uls) >= 3:
+            _pos, _neg, _last = _uls[0], _uls[1], _uls[-1]
+            chk(any("긍정" in x for x in _pr) and any("비판" in x or "반대" in x for x in _pr), "해자 섹션: '긍정적 검토'·'비판적 검토' 라벨 문단")
+            for _nm, _ls in (("긍정", _pos), ("반대", _neg)):
+                _q = sum("(정량)" in x for x in _ls); _l = sum("(정성)" in x for x in _ls)
+                chk(_q >= 2 and _l >= 2, f"해자 {_nm} 목록 (정량) {_q}개·(정성) {_l}개(각 >=2)")
+            chk(abs(len(_pos) - len(_neg)) <= 1, f"해자 긍정 {len(_pos)}개 vs 반대 {len(_neg)}개(차이 <=1)")
+            chk(bool(_last) and _last[-1].lstrip("*").startswith("입증되지 않은 부분"), "해자 섹션 마지막 항목이 '입증되지 않은 부분'")
     chk(sum(b.get("t") in ("table", "flow") for b in _bb) >= 3, f"bm 표·도식 {sum(b.get('t') in ('table','flow') for b in _bb)}개(>=3)")
     chk(len(n.get("issues") or []) >= 3, f"issues {len(n.get('issues') or [])}개(>=3)")
 else:
