@@ -1139,8 +1139,56 @@ def _seg_pnt(lines):
     return None
 
 
+def _seg_status(lines):
+    """'사업부문별 현황' 표(삼양식품형): 헤더 '구분|사업부문|주요제품 및 서비스|매출액|비율(%)|…', 행은 구분 칸이 rowspan 으로 첫 행에만 있어
+    열 수가 들쭉날쭉하다. 금액 칸(쉼표 숫자) 바로 뒤가 비율 칸(숫자)인 위치를 찾고, 그 앞의 '주요제품' 칸 바로 앞 칸을 부문명으로 쓴다.
+    '합계' 행 금액과 부문 합(매출에누리 포함)이 1% 이내일 때만 채택. 매출에누리(음수)는 차트를 깨므로 가장 큰 부문에서 차감하고, 같은 이름이 두 번 나오면
+    제품 칸 첫 낱말을 붙여 구분한다."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|"):
+            continue
+        h = ln.replace(" ", "")
+        if not ("사업부문" in h and "주요제품" in h and "매출액" in h and "비율" in h):
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, total, disc, order = {}, None, 0, []
+        for k in range(i + 1, len(lines)):
+            if not lines[k].startswith("|"):
+                break
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            j = next((q for q in range(len(c) - 1) if re.match(r"^\(?-?[\d,]+\)?$", c[q]) and re.match(r"^-?[\d.]+%?$", c[q + 1])), None)
+            if j is None:
+                continue
+            raw = c[j]
+            v = _num(raw.replace("(", "-").replace(")", ""))
+            if v is None:
+                continue
+            nm = c[j - 2] if j >= 2 else c[0]
+            if nm.replace(" ", "") == "합계" or (j == 1 and c[0].replace(" ", "") == "합계"):
+                total = v
+                continue
+            if nm.replace(" ", "") == "매출에누리" or (j == 1 and c[0].replace(" ", "") == "매출에누리"):
+                disc += v
+                continue
+            if j < 2:
+                continue
+            desc = re.split(r"[,\s]", c[j - 1].strip())[0] if j >= 1 else ""
+            key = nm if nm not in items else f"{nm}({desc})"
+            items[key] = v
+            order.append(key)
+        if total and len(items) >= 2 and abs(sum(items.values()) + disc - total) <= total * 0.01:
+            if disc:  # 매출에누리는 가장 큰 부문(면스낵)에서 차감해 부문 합 = 연결 순매출로 맞춘다(2026년 보고서부터는 처음부터 순매출 기준이라 시계열 단절 방지)
+                big = max(items, key=items.get)
+                items[big] += disc
+            return {k_: v * mult for k_, v in items.items() if v > 0}
+    return None
+
+
 def seg_from_lines(lines):
-    r = _seg_pnt(lines) or _seg_rowspan(lines) or _seg_pumok(lines) or _seg_entity(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
+    r = _seg_pnt(lines) or _seg_status(lines) or _seg_rowspan(lines) or _seg_pumok(lines) or _seg_entity(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
     if r and len(r) < 2:  # 부문이 1개뿐이라 품목 단위 표가 따로 있을 수 있음(대주전자재료: 부문 '전자재료' 아래 품목·용도 칸 표) → 품목 표를 먼저 시도
