@@ -1094,8 +1094,53 @@ def _seg_entity(lines):
     return None
 
 
+def _seg_pnt(lines):
+    """피엔티형 '주요 제품 등의 현황' 표: 헤더 '사업부문|생산(판매)|주요|<기간>매출액(비율)…' + '개시일|품목|(비율)' 둘째 헤더,
+    각 행 '이름 | 개시일 | 품목 | 금액…' 바로 아래 행에 비율. 사업부·자회사별 첫 금액(당기)을 쓰고 '별도기준' 소계는 뺀다.
+    (소계 별도기준 + 자회사 합계 - 내부거래 제거)가 '연결 기준'과 3% 이내일 때만 채택."""
+    for i, ln in enumerate(lines):
+        if not ln.startswith("|") or i + 1 >= len(lines):
+            continue
+        h0 = ln.replace(" ", "")
+        h1 = lines[i + 1].replace(" ", "")
+        if not ("사업부문" in h0 and "생산(판매)" in h0 and "매출액" in h0 and "개시일" in h1):
+            continue
+        cap = next((lines[k] for k in range(i - 1, max(i - 6, -1), -1) if "단위" in lines[k]), "")
+        mult = _unit(cap)
+        if not mult:
+            continue
+        items, internal, cons, sep = {}, None, None, None
+        date = re.compile(r"^\d{4}\.\d{2}\.\d{2}$")
+        for k in range(i + 2, len(lines)):
+            if not lines[k].startswith("|"):
+                break
+            c = [x.strip() for x in lines[k].strip().strip("|").split("|")]
+            nm = c[0]
+            nm2 = nm.replace(" ", "")
+            if re.match(r"^[\d.]+%$", nm2):
+                continue
+            if nm2 == "별도기준":
+                v = _num(c[1]) if len(c) > 1 else None
+                sep = v
+                continue
+            if nm2 == "내부거래제거":
+                internal = _num(c[1].replace("(", "-").replace(")", "")) if len(c) > 1 else None
+                continue
+            if nm2 == "연결기준":
+                cons = _num(c[1]) if len(c) > 1 else None
+                continue
+            if len(c) >= 4 and date.match(c[1].replace(" ", "")):
+                v = _num(c[3])
+                if v is not None and nm not in items:
+                    items[nm] = v
+        if cons and internal is not None and len(items) >= 2:
+            if abs(sum(items.values()) + internal - cons) <= cons * 0.03:
+                return {k_: v * mult for k_, v in items.items() if v > 0}
+    return None
+
+
 def seg_from_lines(lines):
-    r = _seg_rowspan(lines) or _seg_pumok(lines) or _seg_entity(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
+    r = _seg_pnt(lines) or _seg_rowspan(lines) or _seg_pumok(lines) or _seg_entity(lines) or _seg_division(lines) or _seg_subtotal(lines) or _seg_group(lines) or _seg_main(lines)
     if r and any(re.sub(r"\s+", "", k_) in ("별첨", "-") for k_ in r):  # 구체적용도 칸('별첨')을 부문명으로 읽은 경우(상신이디피) 버리고 다른 파서로
         r = None
     if r and len(r) < 2:  # 부문이 1개뿐이라 품목 단위 표가 따로 있을 수 있음(대주전자재료: 부문 '전자재료' 아래 품목·용도 칸 표) → 품목 표를 먼저 시도
