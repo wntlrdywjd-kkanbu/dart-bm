@@ -540,12 +540,17 @@ def extra(base, meta, fin):
               "market": p["market"], "history": p["history"]}
         i = len(qs) - 1
         ni, rv = ttm(q20["당기순이익"], i), ttm(q20["매출액"], i)
+        _ltm = fin.get("ltm") or {}
+        _basis = "TTM(최근 4분기) 연결 당기순이익·매출, 최근 보고서 자본총계"
+        if ni is None and _ltm:  # 신규상장(정기보고서 없음): 투자설명서 반기 검토본으로 LTM = FY + 당반기 − 전년 반기
+            ni, rv = _ltm.get("당기순이익"), _ltm.get("매출액")
+            _basis = "LTM(FY2025+2026반기−2025반기) 별도 당기순이익·매출(투자설명서 기준), 2026.06 자본총계"
         eq = bs["자본총계"][-1] if bs["자본총계"] else None
         dps = (fin.get("dividend") or {}).get("dps") or []
         pv["val"] = {"PER": p["mcap"] / ni if ni and ni > 0 else None, "PBR": p["mcap"] / eq if eq and eq > 0 else None,
                      "PSR": p["mcap"] / rv if rv else None,
                      "배당수익률": (dps[-1] / p["close"] * 100) if dps and dps[-1] and p["close"] else None,
-                     "기준": "TTM(최근 4분기) 연결 당기순이익·매출, 최근 보고서 자본총계"}
+                     "기준": _basis}
         ex["price"] = pv
     return ex
 
