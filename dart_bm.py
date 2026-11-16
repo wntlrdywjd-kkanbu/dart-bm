@@ -1680,6 +1680,17 @@ def collect_capa(reps, maxn=20):
 COST_KEYS = ("성격별", "비용의 성격")
 
 
+def flat_table_rows(line):
+    """'| 캡션 / (단위: 천원) / / 구 분 / 당분기 / 전분기 / / 3개월 / 누적 ... / / 항목 / 값 / ...' 한 줄 표를 행 목록으로 푼다."""
+    segs = [x.strip() for x in line.strip().lstrip("|").strip().split(" / / ")]
+    rows = []
+    for seg in segs[1:]:
+        cells = [c.strip() for c in seg.split(" / ") if c.strip()]
+        if len(cells) >= 2:
+            rows.append("| " + " | ".join(cells) + " |")
+    return rows if len(rows) >= 4 else []
+
+
 def collect_cost_raw(reps, maxn=20):
     """각 보고서 전체 문서에서 '비용의 성격별 분류' 주석 표를 원문 그대로 저장(cache/cost/{rcept}.json). 불변 캐시."""
     cd = os.path.join(CACHE, "cost")
@@ -1696,6 +1707,7 @@ def collect_cost_raw(reps, maxn=20):
             print(f"[경고] 비용 주석 {r['rcept_no']} 실패: {e}", file=sys.stderr)
             continue
         out, ctx = [], []
+        flat = []  # 표 한 칸에 " / " 로 이어붙은 단일 줄 표(선익시스템 2026.09 분기)
         i = 0
         while i < len(lines):
             l = lines[i]
@@ -1705,6 +1717,10 @@ def collect_cost_raw(reps, maxn=20):
                     j += 1
                 near = " ".join(ctx[-8:])
                 body = " ".join(lines[i:j])
+                if j - i == 1 and "성격별" in body[:200] and body.count(" / ") >= 20:
+                    fr = flat_table_rows(l)
+                    if fr:
+                        flat.append((0, {"ctx": ctx[-4:], "rows": fr[:80]}))
                 if (any(k in near for k in COST_KEYS) or ("성격" in body[:200])) and j - i >= 4:
                     c2_ = " ".join(ctx[-2:])
                     pr_ = 0 if ("비용의 성격별" in c2_ and "기능별" not in c2_) else 1  # 주석 앞쪽의 '성격별 비용의 기능별 배분' 표들이 6칸을 채우지 않게 본 표를 먼저
@@ -1714,6 +1730,8 @@ def collect_cost_raw(reps, maxn=20):
             if l.strip():
                 ctx.append(l.strip()[:160])
             i += 1
+        if not out:  # 정상 표가 하나도 없을 때만 단일 줄 표를 쓴다(다른 종목 결과가 바뀌지 않게)
+            out = flat
         json.dump({"key": f"{r['year']}.{r['month']:02d}", "kind": r["kind"], "tables": [t_ for _, t_ in sorted(out, key=lambda x: x[0])][:6]}, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
         n.append(f"{r['rcept_no']}.json")
     return n
