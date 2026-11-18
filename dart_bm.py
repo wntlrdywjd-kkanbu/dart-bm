@@ -1840,6 +1840,7 @@ def region_from_lines(lines):
         if mult is None:
             continue
         grp, tot = None, {}
+        qty_amt = bool(re.search(r"수량\s*\|\s*금액", " ".join(rows[:3])))
         for r in rows[1:]:
             cells = [x.strip() for x in r.strip().strip("|").split("|")]
             labs = {"내수": "dom", "국내": "dom", "수출": "exp", "해외": "exp"}
@@ -1857,6 +1858,8 @@ def region_from_lines(lines):
                 typ = ""
             lab = labs[re.sub(r"\s+", "", cells[idx])]
             vals = cells[idx + 1:]
+            if qty_amt and len(vals) >= 2:  # 헤더가 '수량 | 금액' 쌍이면 첫 숫자(수량)가 아니라 금액 열을 쓴다 (다원넥스뷰 사업보고서)
+                vals = vals[1:]
             v = None
             for c in vals:
                 c2 = c.replace(",", "").strip()
@@ -1872,6 +1875,8 @@ def region_from_lines(lines):
                 tot.setdefault(grp, {})[lab] = tot.get(grp, {}).get(lab, 0.0) + v * mult
             elif grp == "합계" and idx == 0 and v > 0 and "dom" in tot.get(grp, {}) and "exp" not in tot[grp]:  # '합계 | 내수 | …' 다음 줄 '수출 | …' (22.1Q 아스플로)
                 tot[grp]["exp"] = v * mult
+            elif qty_amt and grp == "합계" and idx == 0 and v > 0 and "exp" in tot.get(grp, {}) and "dom" not in tot[grp]:  # '합계 | 수출 | …' 다음 줄 '내수 | …' (다원넥스뷰 사업보고서)
+                tot[grp]["dom"] = v * mult
         pick = tot.get("총계") or tot.get("전체") or tot.get("총합계") or tot.get("합계")
         if pick and "dom" in pick and "exp" in pick:
             dom, exp, found = pick["dom"], pick["exp"], 2
