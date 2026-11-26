@@ -108,6 +108,11 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
   details.rep > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; list-style: none; }
   details.rep .rd { font-family: var(--mono); font-size: 12px; color: var(--muted); } details.rep .rb { font-weight: 600; } details.rep .rt { flex: 1 1 200px; min-width: 0; }
   .tag { font-size: 11.5px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); } .tag.pos { color: var(--s3); } .tag.mid { color: var(--s1); }
+  .tag.tp { color: var(--pos); border-color: var(--pos); } .tag.tn { color: var(--neg); border-color: var(--neg); } .tag.tm { color: var(--warn); }
+  .tbflow { display: flex; flex-wrap: wrap; gap: 6px 4px; align-items: center; margin: 10px 0 4px; } .tbpt { font-size: 12px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); white-space: nowrap; } .tbpt b { font-family: var(--mono); font-weight: 600; } .tbpt.tp { border-color: var(--pos); color: var(--pos); } .tbpt.tn { border-color: var(--neg); color: var(--neg); } .tbar { color: var(--muted); font-size: 11px; }
+  table.tbchk td.sd, table.tbchk td.vv { white-space: nowrap; }
+  @media (max-width: 640px) { table.tbchk thead { display: none; } table.tbchk tr { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 8px 0; border-bottom: 1px solid var(--line); } table.tbchk td { border: 0; padding: 0; white-space: normal; } table.tbchk td.sd { font-size: 12px; color: var(--muted); } table.tbchk td.vv { grid-column: 2; grid-row: 1; } table.tbchk td:nth-child(2) { grid-column: 1 / -1; font-weight: 600; } table.tbchk td:nth-child(3) { grid-column: 1 / -1; font-size: 13px; } }
+  ul.tbax { list-style: none; padding-left: 0; } ul.tbax li b.ax { display: inline-block; min-width: 64px; font-size: 12.5px; } .axs { font-family: var(--mono); font-size: 11.5px; padding: 0 5px; border-radius: 4px; margin-right: 6px; border: 1px solid var(--line); } .axs.tp { color: var(--pos); border-color: var(--pos); } .axs.tn { color: var(--neg); border-color: var(--neg); }
   .rmeta { font-size: 12.5px; color: var(--muted); margin: 8px 0 4px; } .rvs { margin: 6px 0; max-width: none; } ul.rpts { margin: 6px 0; padding-left: 18px; max-width: none; line-height: 1.7; } ul.rpts li { margin: 5px 0; }
   h4.ec { margin: 12px 0 4px; font-size: 12.5px; font-weight: 600; color: var(--muted); } table.e2 td, table.e2 th { padding: 4px 10px; font-size: 12.5px; } table.e2 td:first-child { color: var(--muted); white-space: nowrap; } table.e2 th.fc { color: var(--accent); } ul.el { margin: 2px 0 6px; padding-left: 18px; font-size: 12.5px; line-height: 1.7; max-width: none; }
   table.est { table-layout: fixed; } table.est td { padding: 6px 9px; } table.est td:first-child { width: 28%; min-width: 96px; color: var(--muted); font-size: 12px; } table.est td.n { white-space: normal; text-align: left; font-family: var(--sans); font-size: 12.5px; line-height: 1.7; overflow-wrap: anywhere; } .watch { margin: 8px 0 2px; padding: 8px 10px; border-left: 3px solid var(--s1); background: var(--bg); max-width: none; line-height: 1.65; font-size: 13px; }
@@ -764,7 +769,7 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
     h += det("최근 주요 공시 (증자·사채·계약·자기주식 등)", md(s.secs.s62), true);
     h += det("바뀐 문구 (인접 보고서)", md(s.secs.s6), false);
     // 9 원문
-    if (rs && rs.code === s.code && rs.reports) h += researchBlock(rs);
+    if (rs && rs.code === s.code && rs.reports) h += researchBlock(rs) + tambangBlock(rs);
     h += det("연간 재무표", annualTable(s), false);
     h += det("매출 구성과 부문 표 (원문)", md(s.secs.s2) + (s.secs.s21 ? "<h3>최신 정기보고서 (" + esc(s.latest) + ")</h3>" + md(s.secs.s21) : ""), false);
     h += det("고객·판매 구조", md(s.secs.s3), false) + det("원가 구조", md(s.secs.s4), false) + det("생산·설비·계약", md(s.secs.s5), false) + det("경쟁·시장", md(s.secs.s52), false);
@@ -828,6 +833,33 @@ table.bt { min-width: 560px; } table.bt td, table.bt th { white-space: normal; p
       h += "</details>";
     });
     return h + "<div class='meta'>" + esc(R.caveat || "") + " " + esc(R.note || "") + " 갱신 " + esc(R.updated || "") + "</div></section>";
+  }
+  function tambangBlock(R) {
+    var T = R.tambang; if (!T || !T.items || !T.items.length) return "";
+    var it = T.items;
+    function tl(t) { return t == null ? "–" : (t > 0 ? "+" : "") + t; }
+    function tc(t) { return t == null ? "" : t >= 0.5 ? "tp" : t <= -0.5 ? "tn" : ""; }
+    function vc(v) { v = String(v || ""); return /상회|^부합/.test(v) ? "tp" : /미달/.test(v) ? "tn" : /부분/.test(v) ? "tm" : ""; }
+    function li(lab, arr) { return arr && arr.length ? "<p class='rvs'><b>" + lab + "</b> " + arr.map(esc).join(" · ") + "</p>" : ""; }
+    var kinds = {}; it.forEach(function (x) { kinds[x.kind] = (kinds[x.kind] || 0) + 1; });
+    var h = "<section class='card sec' id='tambang'><div class='q'>탐방·컨콜 노트 — 회사 발언 (비공개 화면)</div><h2 class='vd'>" + esc(T.summary || (it.length + "건의 탐방·컨콜 노트")) + "</h2>";
+    h += "<div class='kpis'>" + stat("노트", it.length + "건", Object.keys(kinds).map(function (k) { return k + " " + kinds[k]; }).join(" · ")) + stat("최근", esc(it[0].date), esc(it[0].kind) + " · 톤 " + tl(it[0].tone)) + stat("기간", esc(it[it.length - 1].date.slice(0, 7)) + " ~ " + esc(it[0].date.slice(0, 7)), "") + "</div>";
+    h += "<div class='tbflow' aria-label='노트별 톤 흐름(오래된 것부터)'>" + it.slice().reverse().map(function (x) { return "<span class='tbpt " + tc(x.tone) + "' title='" + esc(x.summary || "") + "'><b>" + esc(x.date.slice(2).replace(/-/g, ".")) + "</b> " + esc(x.kind) + " " + tl(x.tone) + "</span>"; }).join("<span class='tbar'>→</span>") + "</div>";
+    if (T.check && T.check.length) h += "<h3>회사가 말한 것 vs 실제</h3><div class='scroll'><table class='tbchk'><thead><tr><th>언제</th><th>회사 발언(목표·가이던스)</th><th>실제</th><th>판정</th></tr></thead><tbody>" + T.check.map(function (c) { return "<tr><td class='sd'>" + esc(c.said) + "</td><td>" + esc(c.guide) + "</td><td>" + esc(c.actual) + "</td><td class='vv'><span class='tag " + vc(c.v) + "'>" + esc(c.v) + "</span></td></tr>"; }).join("") + "</tbody></table></div>";
+    h += "<h3>노트별 내용</h3>";
+    it.forEach(function (x, i) {
+      h += "<details class='rep'" + (i === 0 ? " open" : "") + "><summary><span class='rd'>" + esc(x.date) + "</span><span class='rb'>" + esc(x.kind) + "</span><span class='rt'>" + esc(x.summary || "") + "</span><span class='tag " + tc(x.tone) + "'>톤 " + tl(x.tone) + (x.conf_label ? " · " + esc(x.conf_label) : "") + "</span></summary>";
+      if (x.axes && x.axes.length) h += "<ul class='rpts tbax'>" + x.axes.map(function (a) { return "<li><b class='ax'>" + esc(a.k) + "</b><span class='axs " + tc(a.t) + "'>" + tl(a.t) + "</span>" + esc(a.txt) + "</li>"; }).join("") + "</ul>";
+      if (x.perf && x.perf.txt) h += "<p class='rvs'><b>실적 언급" + (x.perf.q ? " (" + esc(x.perf.q) + ")" : "") + "</b> " + esc(x.perf.txt) + "</p>";
+      if (x.guides && x.guides.length) h += "<p class='rvs'><b>가이던스</b> " + x.guides.map(function (g) { return esc(g.k + ": " + g.v + (g.when && g.when !== "-" ? " (" + g.when + ")" : "")); }).join(" · ") + "</p>";
+      if (x.metrics && x.metrics.length) h += "<p class='rvs'><b>지표</b> " + x.metrics.map(function (m) { return esc(m.k + " " + m.v); }).join(" · ") + "</p>";
+      if (x.topics && x.topics.length) h += "<ul class='rpts'>" + x.topics.map(function (t) { return "<li>" + (t.side === 1 ? "▲ " : t.side === -1 ? "▼ " : "· ") + "<b>" + esc(t.k) + "</b> " + esc(t.txt) + "</li>"; }).join("") + "</ul>";
+      h += li("핵심", x.key) + li("리스크", x.risk) + li("다음 확인", x.next);
+      if (x.conf_why) h += "<p class='watch'><b>자신감 판단</b> " + esc(x.conf_why) + "</p>";
+      if (x.url) h += "<div class='rmeta'><a href='" + esc(x.url) + "' target='_blank' rel='noopener'>원문 보기(네이버 프리미엄, 구독 필요)</a>" + (x.detail && x.detail !== "full" ? " · 일부 항목만 정리된 노트" : "") + "</div>";
+      h += "</details>";
+    });
+    return h + "<div class='meta'>" + esc(T.note || "") + "</div></section>";
   }
   function sum4(a, i) { var w = a.slice(Math.max(0, i - 3), i + 1); return w.length === 4 && w.every(ok) ? w.reduce(function (x, y) { return x + y; }, 0) : null; }
 
