@@ -158,8 +158,10 @@ def list_periodic(corp_code):
             continue
         for alt in sorted(allv[key], key=lambda x: (x["rcept_dt"], x["rcept_no"]), reverse=True):
             try:
-                get_biz(alt["rcept_no"])
+                b = get_biz(alt["rcept_no"])
             except RuntimeError:
+                continue
+            if not b:  # 원문은 있으나 '사업의 내용'이 없는 첨부정정 문서(제이브이엠 2025.12) → 이전 접수본
                 continue
             best[key] = alt
             if alt["rcept_no"] != r["rcept_no"]:
