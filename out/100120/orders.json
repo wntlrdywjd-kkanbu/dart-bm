@@ -1,0 +1,21 @@
+{
+ "annual": {
+  "report": "사업보고서 (2025.12)",
+  "tables": [
+   {
+    "caption": "(3) 영업개황 등2012년 출시한 정지영상 엑스레이 디텍터 VIVIX-S는 2022년에는 약 9% 성장했으며, 2023년에는 전년 동기 대비 7% 역성장하였습니다. 2024년에는 제품 및 시장 다변화와 공격적인 영…",
+    "unit": "",
+    "rows": [
+     "| 용도 | 상세 응용 분야 |",
+     "| AOI(Automatic Optical Inspection) | FPD(Flat Panel Display) 제조 공정 및 완성품 검사,PCB(Printed Circuit Board) 제조 공정 중 원판소재 검사,반도체 Wafer 제조, Packaging 공정 중 검사,태양전지 제조 공정 중 검사,광계측기(막 두께, 색도, 휘도, 3차원 높이 측정기 등)…",
+     "| 감시(surveillance) | 항공 촬영, ITS(Intelligent Transportation System), 철도 |",
+     "| 기타(과학연구, digitalization,엔터테인먼트 등) | 2D,3D 측정 시스템, 바이오 영상장비, 현미경, 화학,필름 스캔, 문서 디지털화, 골프 시뮬레이터 |"
+    ]
+   }
+  ]
+ },
+ "latest": {
+  "report": "분기보고서 (2026.09)",
+  "tables": []
+ }
+}
